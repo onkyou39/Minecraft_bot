@@ -1,9 +1,31 @@
+import logging
+
 import os
 import requests
 import time
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+
+# Enable logging
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+
+# set higher logging level for httpx to avoid all GET and POST requests being logged
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+logger = logging.getLogger(__name__)
+
+def log_command(command_name):
+    def decorator(func):
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+            logger.warning(f"{get_user_name(update)} sent COMMAND {command_name}")
+            return await func(update, context, *args, **kwargs)
+        return wrapper
+    return decorator
 
 load_dotenv()
 
@@ -16,9 +38,19 @@ API_TOKEN = os.getenv("API_TOKEN")
 last_poweron_time = 0
 # Время последнего запроса статуса сервера
 last_status_time = 0
-POWERON_COOLDOWN = 5 * 60  # 5 минут в секундах
+POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 STATUS_COOLDOWN = 30 # 30 секунд на запрос статуса
 
+
+def get_user_name(update: Update) -> str:
+    return update.effective_user.username or update.effective_user.full_name or "Неизвестный пользователь"
+
+async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
+    user_name = get_user_name(update)
+    message = f"Пользователь @{user_name} {action}."
+    await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
+
+@log_command("/start")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_name = update.effective_user.username or update.effective_user.full_name
@@ -28,12 +60,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет!")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    """Echo the user message."""
-
     #await update.message.reply_text(update.message.text)
     await update.message.reply_text("Я пока ещё не умею отвечать на сообщения 😐")
 
+@log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_poweron_time
 
@@ -44,7 +74,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
     if now - last_poweron_time < POWERON_COOLDOWN:
         remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным включением VPS.")
+        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным включением сервера.")
         return
 
     try:
@@ -76,12 +106,16 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     else:
                         await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
                         last_poweron_time = now  # обновляем время успешного запуска
+
+                    await notify_admin(update, context, "отправил запрос на включение сервера")
+
                 else:
                     await update.message.reply_text(f"⚠️ Ошибка: {response.status_code}\n{response.text}")
 
     except Exception as e:
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
+@log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global last_status_time
