@@ -1,5 +1,6 @@
 import logging
 
+import random
 import os
 import requests
 import time
@@ -50,6 +51,12 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
 
+async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = get_user_name(update)
+    message = update.message
+    if message:
+        logger.info(f"[{user_name}] написал: {message.text or '[нет текста]'}")
+
 @log_command("/start")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -61,7 +68,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #await update.message.reply_text(update.message.text)
-    await update.message.reply_text("Я пока ещё не умею отвечать на сообщения 😐")
+    user_name = get_user_name(update)
+    message_text = update.message.text
+    logger.info(f"Message from {user_name}: {message_text}")
+    await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,6 +121,8 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 else:
                     await update.message.reply_text(f"⚠️ Ошибка: {response.status_code}\n{response.text}")
+        else:
+            await update.message.reply_text(f"⚠️ Ошибка: {response.status_code}\n{response.text}")
 
     except Exception as e:
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
@@ -157,5 +169,6 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("poweron", poweron))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
+    #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
     application.run_polling()
