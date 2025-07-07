@@ -1,5 +1,5 @@
 import logging
-
+import json
 import random
 import os
 import aiohttp
@@ -17,18 +17,23 @@ logging.basicConfig(
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-
 logger = logging.getLogger(__name__)
+
 
 def log_command(command_name):
     def decorator(func):
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
             logger.info(f"{get_user_name(update)} sent COMMAND {command_name}")
             return await func(update, context, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
+
 load_dotenv()
+
+AUTHORIZED_FILE = "authorized.json"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 AUTHORIZED_CHAT_ID = int(os.getenv("AUTHORIZED_CHAT_ID"))
@@ -42,11 +47,41 @@ LAST_POWEROFF_TIME = 0
 LAST_STATUS_TIME = 0
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 POWEROFF_COOLDOWN = 30
-STATUS_COOLDOWN = 30 # 30 секунд на запрос статуса
+STATUS_COOLDOWN = 30  # 30 секунд на запрос статуса
+
+
+def load_auth_data():
+    try:
+        with open(AUTHORIZED_FILE, "r") as f:
+            data = json.load(f)
+            return set(data.get("users", [])), set(data.get("groups", []))
+    except (FileNotFoundError, json.JSONDecodeError):
+        logger.warning("Authorization file not found or corrupted. Using empty sets.")
+        return set(), set()
+
+
+def save_auth_data():
+    data = {
+        "users": list(AUTHORIZED_USERS),
+        "groups": list(AUTHORIZED_GROUPS)
+    }
+    with open(AUTHORIZED_FILE, "w") as f:
+        json.dump(data, f)
+
+AUTHORIZED_USERS, AUTHORIZED_GROUPS = load_auth_data()
+
+
+def is_authorized(chat_id: int) -> bool:
+    return (
+            chat_id in AUTHORIZED_USERS
+            or chat_id in AUTHORIZED_GROUPS
+            or chat_id == AUTHORIZED_CHAT_ID
+    )
 
 
 def get_user_name(update: Update) -> str:
     return update.effective_user.username or update.effective_user.full_name or "Неизвестный пользователь"
+
 
 async def get_server_status():
     headers = {
@@ -60,16 +95,19 @@ async def get_server_status():
                 return await response.json()
             return {"error": f"{response.status}: {await response.text()}"}
 
+
 async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
+
 
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_user_name(update)
     message = update.message
     if message:
         logger.info(f"[{user_name}] написал: {message.text or '[нет текста]'}")
+
 
 async def api_request(action: str):
     """Общая функция для API-запросов"""
@@ -89,31 +127,78 @@ async def api_request(action: str):
     except Exception as e:
         return {"error": f"Connection error: {str(e)}"}
 
+
 async def shutdown_vps():
     return await api_request("ShutDownGuestOS")
 
+
 @log_command("/start")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
+    if chat_type != 'private':
+        return  # Не отвечаем на start в группе
     chat_id = update.effective_chat.id
     user_name = update.effective_user.username or update.effective_user.full_name
 
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID,
-        text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
-    await update.message.reply_text("Привет!")
+                                   text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
+    await update.message.reply_text("Бот запущен.")
+
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #await update.message.reply_text(update.message.text)
+    chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
+    if chat_type != 'private':
+        return  # Не отвечаем на некомандные сообщения в группе
     user_name = get_user_name(update)
     message_text = update.message.text
     logger.info(f"Message from {user_name}: {message_text}")
     await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
+
+@log_command("/addgroup")
+async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("❗ Эта команда работает только в группе.")
+        return
+
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+        await update.message.reply_text("⛔ Только администратор может добавить группу.")
+        return
+
+    if update.effective_chat.id in AUTHORIZED_GROUPS:
+        await update.message.reply_text("ℹ️ Группа уже добавлена.")
+        return
+
+    AUTHORIZED_GROUPS.add(update.effective_chat.id)
+    save_auth_data()
+    await update.message.reply_text("✅ Группа успешно добавлена в список разрешённых.")
+
+
+@log_command("/removegroup")
+async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type not in ["group", "supergroup"]:
+        await update.message.reply_text("❗ Эта команда работает только в группе.")
+        return
+
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+        await update.message.reply_text("⛔ Только администратор может удалить группу.")
+        return
+
+    if update.effective_chat.id in AUTHORIZED_GROUPS:
+        AUTHORIZED_GROUPS.remove(update.effective_chat.id)
+        save_auth_data()
+        await update.message.reply_text("✅ Группа удалена из списка разрешённых.")
+    else:
+        await update.message.reply_text("ℹ️ Группа не была в списке.")
+
+
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LAST_POWERON_TIME, LAST_STATUS_TIME
 
-    if update.effective_chat.id != AUTHORIZED_CHAT_ID:
-        await update.message.reply_text("⛔ У тебя нет доступа.")
+    if not is_authorized(update.effective_chat.id):
+        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     now = time.time()
@@ -173,7 +258,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Проверка прав
     if update.effective_chat.id != AUTHORIZED_CHAT_ID:
-        await update.message.reply_text("⛔ У тебя нет доступа.")
+        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     # Проверка кулдауна
@@ -229,11 +314,10 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     global LAST_STATUS_TIME
 
-    if update.effective_chat.id != AUTHORIZED_CHAT_ID:
-        await update.message.reply_text("⛔ У тебя нет доступа.")
+    if not is_authorized(update.effective_chat.id):
+        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     now = time.time()
@@ -263,12 +347,15 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in status command: {str(e)}")
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
+
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("poweron", poweron))
     application.add_handler(CommandHandler("poweroff", poweroff))
+    application.add_handler(CommandHandler("addgroup", addgroup))
+    application.add_handler(CommandHandler("removegroup", removegroup))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
     application.run_polling()
