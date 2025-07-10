@@ -7,6 +7,7 @@ import time
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from watchdog import watchdog_tick
 
 # Enable logging
 
@@ -16,6 +17,7 @@ logging.basicConfig(
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -350,9 +352,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in status command: {str(e)}")
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
+    await watchdog_tick(shutdown_vps)
 
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    job_queue = application.job_queue
+    job_queue.run_repeating(watchdog_task, interval=60, first=10)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("poweron", poweron))
@@ -361,4 +367,5 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("removegroup", removegroup))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
+    #application.run_polling(poll_interval=1)
     application.run_polling()
