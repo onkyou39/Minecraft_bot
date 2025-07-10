@@ -46,7 +46,7 @@ LAST_POWEROFF_TIME = 0
 # Время последнего запроса статуса сервера
 LAST_STATUS_TIME = 0
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
-POWEROFF_COOLDOWN = 30
+POWEROFF_COOLDOWN = 5 * 60 # 5 минут
 STATUS_COOLDOWN = 30  # 30 секунд на запрос статуса
 
 
@@ -129,6 +129,9 @@ async def api_request(action: str):
 
 
 async def shutdown_vps():
+    now = time.time()
+    global LAST_POWERON_TIME
+    LAST_POWERON_TIME = now # предотвращение быстрого запуска VPS после включения
     return await api_request("ShutDownGuestOS")
 
 
@@ -257,7 +260,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LAST_POWEROFF_TIME, LAST_STATUS_TIME  # Аналогично poweron
 
     # Проверка прав
-    if update.effective_chat.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
