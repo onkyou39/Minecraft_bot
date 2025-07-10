@@ -6,8 +6,9 @@ import aiohttp
 import time
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
-from watchdog import watchdog_tick
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Job, JobQueue
+from watchdog import watchdog_tick, get_players_list
+from typing import Optional
 
 # Enable logging
 
@@ -43,14 +44,17 @@ API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
 
 # Время последнего успешного запуска VPS (в секундах с эпохи)
-LAST_POWERON_TIME = 0
-LAST_POWEROFF_TIME = 0
+last_poweron_time = 0
+last_poweroff_time = 0
 # Время последнего запроса статуса сервера
-LAST_STATUS_TIME = 0
+last_status_time = 0
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 POWEROFF_COOLDOWN = 5 * 60 # 5 минут
 STATUS_COOLDOWN = 30  # 30 секунд на запрос статуса
 
+
+watchdog_job: Optional[Job] = None
+job_queue: Optional[JobQueue] = None
 
 def load_auth_data():
     try:
@@ -103,6 +107,10 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
 
+async def watchdog_notifyer(message: str):
+    pass
+    # TODO
+
 
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_user_name(update)
@@ -132,9 +140,12 @@ async def api_request(action: str):
 
 async def shutdown_vps():
     now = time.time()
-    global LAST_POWERON_TIME
-    LAST_POWERON_TIME = now # предотвращение быстрого запуска VPS после включения
+    global last_poweron_time
+    last_poweron_time = now # предотвращение быстрого запуска VPS после включения
     return await api_request("ShutDownGuestOS")
+
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
+    await watchdog_tick(shutdown_vps)
 
 
 @log_command("/start")
@@ -155,9 +166,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
     if chat_type != 'private':
         return  # Не отвечаем на некомандные сообщения в группе
-    user_name = get_user_name(update)
+    """user_name = get_user_name(update)
     message_text = update.message.text
-    logger.info(f"Message from {user_name}: {message_text}")
+    logger.info(f"Message from {user_name}: {message_text}")"""
     await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
 
@@ -200,20 +211,20 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global LAST_POWERON_TIME, LAST_STATUS_TIME
+    global last_poweron_time, last_status_time, watchdog_job, job_queue
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     now = time.time()
-    if now - LAST_POWERON_TIME < POWERON_COOLDOWN:
-        remaining = int(POWERON_COOLDOWN - (now - LAST_POWERON_TIME))
+    if now - last_poweron_time < POWERON_COOLDOWN:
+        remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным включением сервера.")
         return
 
-    if now - LAST_STATUS_TIME < STATUS_COOLDOWN:
-        remaining = int(STATUS_COOLDOWN - (now - LAST_STATUS_TIME))
+    if now - last_status_time < STATUS_COOLDOWN:
+        remaining = int(STATUS_COOLDOWN - (now - last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом.")
         return
 
@@ -226,9 +237,13 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         is_power_on = server_status.get("IsPowerOn")
 
+        if watchdog_job is None:
+            watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog")
+            logger.info("Started watchdog job")
+
         if is_power_on is True:
             await update.message.reply_text("✅ Сервер уже включен.")
-            LAST_STATUS_TIME = now
+            last_status_time = now
             return
 
         elif is_power_on is False:
@@ -245,7 +260,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
-            LAST_POWERON_TIME = now
+            last_poweron_time = now
             await notify_admin(update, context, "отправил запрос на включение сервера")
 
         else:
@@ -259,7 +274,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @log_command("/poweroff")
 async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /poweroff"""
-    global LAST_POWEROFF_TIME, LAST_STATUS_TIME  # Аналогично poweron
+    global last_poweroff_time, last_status_time, watchdog_job, job_queue  # Аналогично poweron
 
     # Проверка прав
     if update.effective_user.id != AUTHORIZED_CHAT_ID:
@@ -268,13 +283,13 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Проверка кулдауна
     now = time.time()
-    if now - LAST_POWEROFF_TIME < POWEROFF_COOLDOWN:
-        remaining = int(POWEROFF_COOLDOWN - (now - LAST_POWEROFF_TIME))
+    if now - last_poweroff_time < POWEROFF_COOLDOWN:
+        remaining = int(POWEROFF_COOLDOWN - (now - last_poweroff_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} сек. перед повторным выключением.")
         return
 
-    if now - LAST_STATUS_TIME < STATUS_COOLDOWN:
-        remaining = int(STATUS_COOLDOWN - (now - LAST_STATUS_TIME))
+    if now - last_status_time < STATUS_COOLDOWN:
+        remaining = int(STATUS_COOLDOWN - (now - last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом.")
         return
 
@@ -287,9 +302,14 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         is_power_on = server_status.get("IsPowerOn")
 
+        if watchdog_job is not None:
+            watchdog_job.schedule_removal()
+            watchdog_job = None
+            logger.info("Removed watchdog job")
+
         if is_power_on is False:
             await update.message.reply_text("✅ Сервер уже выключен.")
-            LAST_STATUS_TIME = now
+            last_status_time = now
             return
 
         elif is_power_on is True:
@@ -306,7 +326,8 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
-            LAST_POWEROFF_TIME = now
+            last_poweroff_time = now
+
             await notify_admin(update, context, "отправил запрос на выключение сервера")
 
         else:
@@ -319,15 +340,15 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global LAST_STATUS_TIME
+    global last_status_time, watchdog_job
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     now = time.time()
-    if now - LAST_STATUS_TIME < STATUS_COOLDOWN:
-        remaining = int(STATUS_COOLDOWN - (now - LAST_STATUS_TIME))
+    if now - last_status_time < STATUS_COOLDOWN:
+        remaining = int(STATUS_COOLDOWN - (now - last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом статуса сервера.")
         return
 
@@ -339,12 +360,24 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-        LAST_STATUS_TIME = now  # обновляем время успешного запроса статуса
+        last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on is True:
-            await update.message.reply_text("🟢 Сервер включен.")
+            players, names = await get_players_list()
+            if players and names is not None:
+                await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов): {names}")
+                if watchdog_job is None:
+                    watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10,
+                                                           name="minecraft_watchdog")
+                    logger.info("Started watchdog job")
+            else:
+                await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен")
         elif is_power_on is False:
             await update.message.reply_text("🔴 Сервер выключен.")
+            if watchdog_job is not None:
+                watchdog_job.schedule_removal()
+                watchdog_job = None
+                logger.info("Removed watchdog job")
         else:
             await update.message.reply_text("❓ Не удалось определить состояние сервера.")
 
@@ -352,13 +385,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in status command: {str(e)}")
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
-async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
-    await watchdog_tick(shutdown_vps)
 
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    job_queue = application.job_queue
-    job_queue.run_repeating(watchdog_task, interval=60, first=10)
+    if job_queue is None:
+        job_queue = application.job_queue
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("poweron", poweron))
