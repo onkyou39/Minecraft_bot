@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import os
@@ -26,19 +27,38 @@ async def get_players_list():
     return await check_server_players(SERVER_ADDRESS, QUERY_PORT)
 
 
-async def check_server_players(server_address: str, port: int):
+async def fast_check(host: str, port: int, timeout: float = 2.0):
     try:
-        server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=2)
-        status = await server.async_status()  # Query-запрос
-
-        players_online = status.players.online
-        logger.debug(f"Watchdog: ONLINE {players_online} players online.")
-        return players_online
-
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=timeout
+        )
+        writer.close()
+        await writer.wait_closed()
+        logger.debug("Watchdog: port fast check — port is open.")
+        return True
+    except (ConnectionRefusedError, asyncio.TimeoutError, OSError):
+        logger.debug("Watchdog: port fast check — server offline or unreachable.")
+        return False
     except Exception as e:
-        logger.debug(f"Watchdog: OFFLINE  Minecraft server unreachable. {e}")
+        logger.exception(f"Watchdog: port fast check — unknown exception: {e}")
         return None
 
+async def check_server_players(server_address: str, port: int):
+    is_open = await fast_check(server_address, port, timeout=1)
+    if is_open:
+        try:
+            server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=3)
+            status = await server.async_status()  # Query-запрос
+            players_online = status.players.online
+            logger.debug(f"Watchdog: ONLINE {players_online} players online.")
+            return players_online
+
+        except Exception as e:
+            logger.debug(f"Watchdog: OFFLINE Minecraft server unreachable. {e}")
+            return None
+    else:
+        return None
 
 empty_since: Optional[float] = None  # Когда сервер стал пустым
 notified = False # Флаги для уведомлений
@@ -63,7 +83,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             logger.warning("Watchdog: server remained empty, cooldown passed — shutting down VPS")
             if notify_callback:
                 await notify_callback(f"🛑 На сервере не было игроков больше {WD_POWEROFF_COOLDOWN // 60} минут."
-                                      f" Отправлена команда на выключение VPS.")
+                                      f" Отправлена команда на выключение.")
             await shutdown_callback()
             empty_since = None  # Reset after shutdown
             notified = False  # сбрасываем флаг после выключения
