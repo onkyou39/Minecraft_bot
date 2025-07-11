@@ -140,8 +140,13 @@ async def api_request(action: str):
 
 async def shutdown_vps():
     now = time.time()
-    global last_poweron_time
+    global last_poweron_time, watchdog_job
     last_poweron_time = now # предотвращение быстрого запуска VPS после включения
+    # после выключения VPS сбрасываем задачу watchdog
+    if watchdog_job is not None:
+        watchdog_job.schedule_removal()
+        watchdog_job = None
+        logger.info("Removed watchdog job")
     return await api_request("ShutDownGuestOS")
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
@@ -302,11 +307,6 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         is_power_on = server_status.get("IsPowerOn")
 
-        if watchdog_job is not None:
-            watchdog_job.schedule_removal()
-            watchdog_job = None
-            logger.info("Removed watchdog job")
-
         if is_power_on is False:
             await update.message.reply_text("✅ Сервер уже выключен.")
             last_status_time = now
@@ -363,9 +363,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on is True:
-            players, names = await get_players_list()
-            if players and names is not None:
-                await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов): {names}")
+            players = await get_players_list()
+            if players is not None:
+                await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов).")
                 if watchdog_job is None:
                     watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10,
                                                            name="minecraft_watchdog")
