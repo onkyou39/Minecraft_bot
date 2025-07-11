@@ -20,6 +20,9 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
+notify_logger = logging.getLogger("notify")
+logging.getLogger("notify").setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,6 +34,13 @@ def log_command(command_name):
 
         return wrapper
 
+    return decorator
+
+def command_handler(command):
+    def decorator(func):
+        handler = CommandHandler(command, func)
+        application.add_handler(handler)
+        return func
     return decorator
 
 
@@ -108,8 +118,11 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
 
 async def watchdog_notifyer(message: str):
-    pass
-    # TODO
+    try:
+        await application.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message) # type: ignore
+        notify_logger.debug(f"Watchdog sent notification: {message}")
+    except Exception as e:
+        notify_logger.debug(f"Watchdog notification failed: {str(e)}")
 
 
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -150,7 +163,7 @@ async def shutdown_vps():
     return await api_request("ShutDownGuestOS")
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
-    await watchdog_tick(shutdown_vps)
+    await watchdog_tick(shutdown_vps, watchdog_notifyer)
 
 
 @log_command("/start")
@@ -195,6 +208,52 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_auth_data()
     await update.message.reply_text("✅ Группа успешно добавлена в список разрешённых.")
 
+@log_command("/adduser")
+async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+        await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "ℹ️ Укажите user_id (только цифры).\n"
+            "Формат: /adduser user_id [user_id2 ...]\n"
+            "Пример: /adduser 12345 67890"
+        )
+        return
+
+    added_users = []
+    existing_users = []
+    invalid_users = []
+
+    for raw_arg in context.args:
+        if not raw_arg.isdigit():
+            invalid_users.append(raw_arg)
+            continue
+
+        if raw_arg in AUTHORIZED_USERS:
+            existing_users.append(raw_arg)
+            continue
+
+        AUTHORIZED_USERS.add(raw_arg)
+        added_users.append(raw_arg)
+
+        # Сохраняем только если были добавлены новые пользователи
+    if added_users:
+        save_auth_data()
+
+        # Формируем ответ
+    response = []
+    if added_users:
+        response.append(f"✅ Добавлены пользователи: {', '.join(added_users)}")
+    if existing_users:
+        response.append(f"ℹ️ Уже были добавлены: {', '.join(existing_users)}")
+    if invalid_users:
+        response.append(f"❌ Некорректные ID: {', '.join(invalid_users)}")
+
+    await update.message.reply_text('\n'.join(response) if response else "⚠️ Ничего не изменилось.")
+
+
 
 @log_command("/removegroup")
 async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -212,6 +271,84 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Группа удалена из списка разрешённых.")
     else:
         await update.message.reply_text("ℹ️ Группа не была в списке.")
+
+@log_command("/removeuser")
+async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверка прав администратора
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+        await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
+        return
+
+    # Проверка наличия аргументов
+    if not context.args:
+        await update.message.reply_text(
+            "ℹ️ Укажите user_id для удаления (только цифры).\n"
+            "Формат: /removeuser user_id [user_id2 ...]\n"
+            "Пример: /removeuser 12345 67890"
+        )
+        return
+
+    removed_users = []
+    missing_users = []
+    invalid_users = []
+
+    # Обработка каждого аргумента
+    for raw_arg in context.args:
+        # Строгая проверка на число
+        if not raw_arg.isdigit():
+            invalid_users.append(raw_arg)
+            continue
+
+        # Удаление пользователя
+        if raw_arg in AUTHORIZED_USERS:
+            AUTHORIZED_USERS.remove(raw_arg)
+            removed_users.append(raw_arg)
+        else:
+            missing_users.append(raw_arg)
+
+    # Сохраняем изменения если были удаления
+    if removed_users:
+        save_auth_data()
+
+    # Формируем ответ
+    response = []
+    if removed_users:
+        response.append(f"✅ Удалены пользователи: {', '.join(removed_users)}")
+    if missing_users:
+        response.append(f"ℹ️ Не найдены: {', '.join(missing_users)}")
+    if invalid_users:
+        response.append(f"❌ Некорректные ID: {', '.join(invalid_users)}")
+
+    await update.message.reply_text('\n'.join(response) if response else "⚠️ Ничего не изменилось.")
+
+@log_command("/authorized")
+async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверка прав администратора
+    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+        await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
+        return
+
+    # Формируем сообщение
+    message = ["📋 Список авторизованных:"]
+
+    # Список пользователей
+    if AUTHORIZED_USERS:
+        users_list = "\n".join(f"👤 {user_id}" for user_id in sorted(AUTHORIZED_USERS))
+        message.append(f"\n🔹 Пользователи ({len(AUTHORIZED_USERS)}):\n{users_list}")
+    else:
+        message.append("\n🔹 Пользователи: список пуст")
+
+    # Список групп
+    if AUTHORIZED_GROUPS:
+        groups_list = "\n".join(f"👥 {group_id}" for group_id in sorted(AUTHORIZED_GROUPS))
+        message.append(f"\n🔹 Группы ({len(AUTHORIZED_GROUPS)}):\n{groups_list}")
+    else:
+        message.append("\n🔹 Группы: список пуст")
+
+    # Добавляем инструкцию
+    message.append("\nℹ️ Используйте /adduser, /removeuser, /addgroup, /removegroup для управления")
+
+    await update.message.reply_text("".join(message))
 
 
 @log_command("/poweron")
@@ -261,7 +398,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             state = result.get("State", "Unknown")
             if state == "InProgress":
-                await update.message.reply_text("✅ Сервер запускается, пожалуйста, подождите...")
+                await update.message.reply_text("✅⏳ Сервер запускается, пожалуйста, подождите...")
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
@@ -386,6 +523,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
 
+
+
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     if job_queue is None:
@@ -396,7 +535,10 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("poweroff", poweroff))
     application.add_handler(CommandHandler("addgroup", addgroup))
     application.add_handler(CommandHandler("removegroup", removegroup))
+    application.add_handler(CommandHandler("adduser", adduser))
+    application.add_handler(CommandHandler("removeuser", removeuser))
+    application.add_handler(CommandHandler("authorized", list_authorized))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
-    #application.run_polling(poll_interval=1)
-    application.run_polling()
+    application.run_polling(poll_interval=1, timeout=30)
+    #application.run_polling()

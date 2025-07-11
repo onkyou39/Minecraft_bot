@@ -28,7 +28,7 @@ async def get_players_list():
 
 async def check_server_players(server_address: str, port: int):
     try:
-        server = await JavaServer.async_lookup(f"{server_address}:{port}")
+        server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=2)
         status = await server.async_status()  # Query-запрос
 
         players_online = status.players.online
@@ -41,12 +41,19 @@ async def check_server_players(server_address: str, port: int):
 
 
 empty_since: Optional[float] = None  # Когда сервер стал пустым
-notified = False # Флаг для уведомлений
+notified = False # Флаги для уведомлений
+is_fresh_start = True
+
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
-    global empty_since, notified
+    global empty_since, notified, is_fresh_start
     players = await check_server_players(SERVER_ADDRESS, QUERY_PORT)
     now = time.time()
+
+    if players is not None and is_fresh_start:
+        if notify_callback:
+            await notify_callback(f"✅ Minecraft сервер запущен.")
+        is_fresh_start = False
 
     if players == 0:
         if empty_since is None:
@@ -60,12 +67,14 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             await shutdown_callback()
             empty_since = None  # Reset after shutdown
             notified = False  # сбрасываем флаг после выключения
+            is_fresh_start = True # следующий запуск будет новым
         else:
             remaining = int(WD_POWEROFF_COOLDOWN - (now - empty_since))
             logger.info(f"Watchdog: server still empty, {remaining} seconds left until shutdown")
             if notify_callback and not notified:
                 await notify_callback(f"ℹ️ На сервере нет игроков. "
-                                      f"Сервер будет выключен через {remaining // 60} минут")
+                                      f"Сервер будет выключен через {(remaining + 60) // 60} минут.")
+                                     # поправка на задержку вызова задачи
                 notified = True  # для однократного вывода
 
     else:
