@@ -60,7 +60,7 @@ last_poweroff_time = 0
 last_status_time = 0
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 POWEROFF_COOLDOWN = 5 * 60 # 5 минут
-STATUS_COOLDOWN = 30  # 30 секунд на запрос статуса
+STATUS_COOLDOWN = 5  # запрос статуса
 
 
 watchdog_job: Optional[Job] = None
@@ -119,7 +119,10 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
 
 async def watchdog_notifyer(message: str):
     try:
-        await application.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message) # type: ignore
+        for chat_id in list(AUTHORIZED_GROUPS.union(AUTHORIZED_USERS)):
+            if chat_id:
+                await application.bot.send_message(chat_id=str(chat_id), text=message)  # type: ignore
+        #await application.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message) # type: ignore
         notify_logger.debug(f"Watchdog sent notification: {message}")
     except Exception as e:
         notify_logger.debug(f"Watchdog notification failed: {str(e)}")
@@ -231,11 +234,11 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
             invalid_users.append(raw_arg)
             continue
 
-        if raw_arg in AUTHORIZED_USERS:
+        if int(raw_arg) in AUTHORIZED_USERS:
             existing_users.append(raw_arg)
             continue
 
-        AUTHORIZED_USERS.add(raw_arg)
+        AUTHORIZED_USERS.add(int(raw_arg))
         added_users.append(raw_arg)
 
         # Сохраняем только если были добавлены новые пользователи
@@ -300,8 +303,8 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
             continue
 
         # Удаление пользователя
-        if raw_arg in AUTHORIZED_USERS:
-            AUTHORIZED_USERS.remove(raw_arg)
+        if int(raw_arg) in AUTHORIZED_USERS:
+            AUTHORIZED_USERS.remove(int(raw_arg))
             removed_users.append(raw_arg)
         else:
             missing_users.append(raw_arg)
@@ -403,6 +406,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
             last_poweron_time = now
+            last_status_time = now
             await notify_admin(update, context, "отправил запрос на включение сервера")
 
         else:
@@ -464,6 +468,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
             last_poweroff_time = now
+            last_status_time = now
 
             await notify_admin(update, context, "отправил запрос на выключение сервера")
 
