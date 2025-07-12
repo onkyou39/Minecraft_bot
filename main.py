@@ -378,7 +378,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             state = result.get("State", "Unknown")
             if state == "InProgress":
-                await update.message.reply_text("✅⏳ Сервер запускается, пожалуйста, подождите...")
+                await update.message.reply_text("✅ Запрос на включение отправлен, пожалуйста, подождите...")
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
@@ -474,8 +474,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом статуса сервера.")
         return
 
-    active_chats.add(update.effective_chat.id)
-
     try:
 
         # Запрос текущего статуса
@@ -487,6 +485,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on is True:
+            active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
             players = await get_players_list()
             if players is not None:
                 await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов).")
