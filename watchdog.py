@@ -67,6 +67,7 @@ crashed = False # Сервер упал или ещё не запустился
 
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
+    logger.debug("Watchdog tick")
     global empty_since, notified, is_fresh_start, crashed
     players = await check_server_players(SERVER_ADDRESS, QUERY_PORT)
     now = time.time()
