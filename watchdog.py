@@ -109,9 +109,11 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         if not is_fresh_start:
             logger.warning("Watchdog: looks like minecraft server is crashed.")
         else:
-            logger.info("Watchdog: Minecraft server is processing first startup.")
+            logger.info("Watchdog: Minecraft server is offline and probably starting.")
         if notify_callback and not crashed and not is_fresh_start:
-            await notify_callback("⚠️ Minecraft сервер аварийно завершил работу, осуществляется перезапуск.")
+            await notify_callback("⚠️ Minecraft сервер аварийно завершил работу.")
+            notified = False
+            is_fresh_start = True # для вывода уведомления о запуске
         elif notify_callback and not crashed and is_fresh_start:
             await notify_callback("⏳ Запускается Minecraft сервер.")
         crashed = True
