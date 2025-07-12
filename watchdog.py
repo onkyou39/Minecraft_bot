@@ -115,6 +115,6 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             notified = False
             is_fresh_start = True # для вывода уведомления о запуске
         elif notify_callback and not crashed and is_fresh_start:
-            await notify_callback("⏳ Запускается Minecraft сервер.")
+            await notify_callback("⏳ Minecraft сервер запускается...")
         crashed = True
         empty_since = None #  сброс таймера до корректного восстановления работы
