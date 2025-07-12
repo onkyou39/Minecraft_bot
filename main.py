@@ -178,7 +178,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_type != 'private':
         return  # Не отвечаем на start в группе
     chat_id = update.effective_chat.id
-    user_name = update.effective_user.username or update.effective_user.full_name
+    user_name = get_user_name(update)
 
     await context.bot.send_message(chat_id=ADMIN_CHAT_ID,
                                    text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
