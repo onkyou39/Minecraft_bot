@@ -96,8 +96,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             logger.info(f"Watchdog: server still empty, {remaining} seconds left until shutdown")
             if notify_callback and not notified:
                 await notify_callback(f"ℹ️ На сервере нет игроков. "
-                                      f"Сервер будет выключен через {(remaining + 60) // 60} минут.")
-                                     # поправка на задержку вызова задачи
+                                      f"Сервер будет выключен через {WD_POWEROFF_COOLDOWN // 60} минут.")
                 notified = True  # для однократного вывода
 
     elif players is not None:
