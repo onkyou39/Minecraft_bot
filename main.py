@@ -36,13 +36,6 @@ def log_command(command_name):
 
     return decorator
 
-def command_handler(command):
-    def decorator(func):
-        handler = CommandHandler(command, func)
-        application.add_handler(handler)
-        return func
-    return decorator
-
 
 load_dotenv()
 
@@ -62,27 +55,32 @@ POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 POWEROFF_COOLDOWN = 5 * 60 # 5 минут
 STATUS_COOLDOWN = 5  # запрос статуса
 
-
 watchdog_job: Optional[Job] = None
 job_queue: Optional[JobQueue] = None
+
 
 def load_auth_data():
     try:
         with open(AUTHORIZED_FILE, "r") as f:
             data = json.load(f)
-            return set(data.get("users", [])), set(data.get("groups", []))
+            # Преобразуем список пользователей в словарь с int ключами
+            users = {int(user["id"]): user.get("username", "")
+                     for user in data.get("users", [])}
+            return users, set(data.get("groups", []))
     except (FileNotFoundError, json.JSONDecodeError):
         logger.warning("Authorization file not found or corrupted. Using empty sets.")
-        return set(), set()
+        return {}, set()
 
 
 def save_auth_data():
     data = {
-        "users": list(AUTHORIZED_USERS),
+        "users": [{"id": uid, "username": name}
+                  for uid, name in AUTHORIZED_USERS.items()],
         "groups": list(AUTHORIZED_GROUPS)
     }
     with open(AUTHORIZED_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
+
 
 AUTHORIZED_USERS, AUTHORIZED_GROUPS = load_auth_data()
 
@@ -117,12 +115,12 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
 
+
 async def watchdog_notifyer(message: str):
     try:
-        for chat_id in list(AUTHORIZED_GROUPS.union(AUTHORIZED_USERS)):
+        for chat_id in list(AUTHORIZED_GROUPS.union(AUTHORIZED_USERS.keys())):
             if chat_id:
-                await application.bot.send_message(chat_id=str(chat_id), text=message)  # type: ignore
-        #await application.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message) # type: ignore
+                await application.bot.send_message(chat_id=chat_id, text=message) # type: ignore
         notify_logger.debug(f"Watchdog sent notification: {message}")
     except Exception as e:
         notify_logger.debug(f"Watchdog notification failed: {str(e)}")
@@ -157,13 +155,14 @@ async def api_request(action: str):
 async def shutdown_vps():
     now = time.time()
     global last_poweron_time, watchdog_job
-    last_poweron_time = now # предотвращение быстрого запуска VPS после включения
+    last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу watchdog
     if watchdog_job is not None:
         watchdog_job.schedule_removal()
         watchdog_job = None
         logger.info("Removed watchdog job")
     return await api_request("ShutDownGuestOS")
+
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
     await watchdog_tick(shutdown_vps, watchdog_notifyer)
@@ -211,51 +210,36 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_auth_data()
     await update.message.reply_text("✅ Группа успешно добавлена в список разрешённых.")
 
+
 @log_command("/adduser")
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != AUTHORIZED_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
 
-    if not context.args:
+    if not context.args or len(context.args) > 2:
         await update.message.reply_text(
-            "ℹ️ Укажите user_id (только цифры).\n"
-            "Формат: /adduser user_id [user_id2 ...]\n"
-            "Пример: /adduser 12345 67890"
+            "ℹ️ Использование: /adduser user_id [@username]\n"
+            "Пример: /adduser 123456 @user"
         )
         return
 
-    added_users = []
-    existing_users = []
-    invalid_users = []
+    user_id = context.args[0]
+    if not user_id.isdigit():
+        await update.message.reply_text("⛔ user_id должен быть числом.")
+        return
 
-    for raw_arg in context.args:
-        if not raw_arg.isdigit():
-            invalid_users.append(raw_arg)
-            continue
+    username = context.args[1].lstrip("@") if len(context.args) == 2 else ""
 
-        if int(raw_arg) in AUTHORIZED_USERS:
-            existing_users.append(raw_arg)
-            continue
+    if user_id in AUTHORIZED_USERS:
+        await update.message.reply_text(f"ℹ️ Пользователь {user_id} уже в списке.")
+        return
 
-        AUTHORIZED_USERS.add(int(raw_arg))
-        added_users.append(raw_arg)
+    AUTHORIZED_USERS[user_id] = username
+    save_auth_data()
 
-        # Сохраняем только если были добавлены новые пользователи
-    if added_users:
-        save_auth_data()
-
-        # Формируем ответ
-    response = []
-    if added_users:
-        response.append(f"✅ Добавлены пользователи: {', '.join(added_users)}")
-    if existing_users:
-        response.append(f"ℹ️ Уже были добавлены: {', '.join(existing_users)}")
-    if invalid_users:
-        response.append(f"❌ Некорректные ID: {', '.join(invalid_users)}")
-
-    await update.message.reply_text('\n'.join(response) if response else "⚠️ Ничего не изменилось.")
-
+    await update.message.reply_text(
+        f"✅ Добавлен пользователь {user_id} (@{username})" if username else f"✅ Добавлен пользователь {user_id}")
 
 
 @log_command("/removegroup")
@@ -275,6 +259,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("ℹ️ Группа не была в списке.")
 
+
 @log_command("/removeuser")
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка прав администратора
@@ -282,47 +267,31 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
         return
 
-    # Проверка наличия аргументов
-    if not context.args:
+    # Проверка наличия ровно одного аргумента
+    if len(context.args) != 1:
         await update.message.reply_text(
-            "ℹ️ Укажите user_id для удаления (только цифры).\n"
-            "Формат: /removeuser user_id [user_id2 ...]\n"
-            "Пример: /removeuser 12345 67890"
+            "ℹ️ Использование: /removeuser user_id\n"
+            "Пример: /removeuser 12345"
         )
         return
 
-    removed_users = []
-    missing_users = []
-    invalid_users = []
+    user_id = context.args[0]
+    if not user_id.isdigit():
+        await update.message.reply_text("⛔ user_id должен быть числом.")
+        return
 
-    # Обработка каждого аргумента
-    for raw_arg in context.args:
-        # Строгая проверка на число
-        if not raw_arg.isdigit():
-            invalid_users.append(raw_arg)
-            continue
+    if int(user_id) not in AUTHORIZED_USERS:
+        await update.message.reply_text(f"ℹ️ Пользователь {user_id} не найден в списке.")
+        return
 
-        # Удаление пользователя
-        if int(raw_arg) in AUTHORIZED_USERS:
-            AUTHORIZED_USERS.remove(int(raw_arg))
-            removed_users.append(raw_arg)
-        else:
-            missing_users.append(raw_arg)
+    # Удаляем пользователя
+    AUTHORIZED_USERS.pop(int(user_id))
 
-    # Сохраняем изменения если были удаления
-    if removed_users:
-        save_auth_data()
+    # Сохраняем изменения
+    save_auth_data()
 
-    # Формируем ответ
-    response = []
-    if removed_users:
-        response.append(f"✅ Удалены пользователи: {', '.join(removed_users)}")
-    if missing_users:
-        response.append(f"ℹ️ Не найдены: {', '.join(missing_users)}")
-    if invalid_users:
-        response.append(f"❌ Некорректные ID: {', '.join(invalid_users)}")
+    await update.message.reply_text(f"✅ Пользователь {user_id} удалён.")
 
-    await update.message.reply_text('\n'.join(response) if response else "⚠️ Ничего не изменилось.")
 
 @log_command("/authorized")
 async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -331,12 +300,14 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
         return
 
-    # Формируем сообщение
     message = ["📋 Список авторизованных:"]
 
-    # Список пользователей
+    # Список пользователей с именами, если есть
     if AUTHORIZED_USERS:
-        users_list = "\n".join(f"👤 {user_id}" for user_id in sorted(AUTHORIZED_USERS))
+        users_list = "\n".join(
+            f"👤 {user_id}" + (f" (@{username})" if username else "")
+            for user_id, username in sorted(AUTHORIZED_USERS.items(), key=lambda x: int(x[0]))
+        )
         message.append(f"\n🔹 Пользователи ({len(AUTHORIZED_USERS)}):\n{users_list}")
     else:
         message.append("\n🔹 Пользователи: список пуст")
@@ -348,7 +319,7 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         message.append("\n🔹 Группы: список пуст")
 
-    # Добавляем инструкцию
+    # Инструкция по управлению
     message.append("\nℹ️ Используйте /adduser, /removeuser, /addgroup, /removegroup для управления")
 
     await update.message.reply_text("".join(message))
@@ -513,7 +484,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                            name="minecraft_watchdog")
                     logger.info("Started watchdog job")
             else:
-                await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен")
+                await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
         elif is_power_on is False:
             await update.message.reply_text("🔴 Сервер выключен.")
             if watchdog_job is not None:
@@ -526,8 +497,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in status command: {str(e)}")
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
-
-
 
 
 if __name__ == "__main__":
