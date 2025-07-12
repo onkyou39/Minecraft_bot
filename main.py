@@ -58,6 +58,8 @@ STATUS_COOLDOWN = 5  # запрос статуса
 watchdog_job: Optional[Job] = None
 job_queue: Optional[JobQueue] = None
 
+active_chats = set()
+
 
 def load_auth_data():
     try:
@@ -75,20 +77,20 @@ def load_auth_data():
 def save_auth_data():
     data = {
         "users": [{"id": uid, "username": name}
-                  for uid, name in AUTHORIZED_USERS.items()],
-        "groups": list(AUTHORIZED_GROUPS)
+                  for uid, name in authorized_users.items()],
+        "groups": list(authorized_groups)
     }
     with open(AUTHORIZED_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 
-AUTHORIZED_USERS, AUTHORIZED_GROUPS = load_auth_data()
+authorized_users, authorized_groups = load_auth_data()
 
 
 def is_authorized(chat_id: int) -> bool:
     return (
-            chat_id in AUTHORIZED_USERS
-            or chat_id in AUTHORIZED_GROUPS
+            chat_id in authorized_users
+            or chat_id in authorized_groups
             or chat_id == ADMIN_CHAT_ID
     )
 
@@ -118,7 +120,8 @@ async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
 
 async def watchdog_notifyer(message: str):
     try:
-        for chat_id in list(AUTHORIZED_GROUPS.union(AUTHORIZED_USERS.keys())):
+        #for chat_id in list(authorized_groups.union(authorized_users.keys())):
+        for chat_id in active_chats:
             if chat_id:
                 await application.bot.send_message(chat_id=chat_id, text=message) # type: ignore
         notify_logger.debug(f"Watchdog sent notification: {message}")
@@ -154,6 +157,7 @@ async def api_request(action: str):
 
 async def shutdown_vps():
     now = time.time()
+    active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
     global last_poweron_time, watchdog_job
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу watchdog
@@ -202,11 +206,11 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может добавить группу.")
         return
 
-    if update.effective_chat.id in AUTHORIZED_GROUPS:
+    if update.effective_chat.id in authorized_groups:
         await update.message.reply_text("ℹ️ Группа уже добавлена.")
         return
 
-    AUTHORIZED_GROUPS.add(update.effective_chat.id)
+    authorized_groups.add(update.effective_chat.id)
     save_auth_data()
     await update.message.reply_text("✅ Группа успешно добавлена в список разрешённых.")
 
@@ -231,11 +235,11 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = context.args[1].lstrip("@") if len(context.args) == 2 else ""
 
-    if user_id in AUTHORIZED_USERS:
+    if user_id in authorized_users:
         await update.message.reply_text(f"ℹ️ Пользователь {user_id} уже в списке.")
         return
 
-    AUTHORIZED_USERS[user_id] = username
+    authorized_users[user_id] = username
     save_auth_data()
 
     await update.message.reply_text(
@@ -252,8 +256,8 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может удалить группу.")
         return
 
-    if update.effective_chat.id in AUTHORIZED_GROUPS:
-        AUTHORIZED_GROUPS.remove(update.effective_chat.id)
+    if update.effective_chat.id in authorized_groups:
+        authorized_groups.remove(update.effective_chat.id)
         save_auth_data()
         await update.message.reply_text("✅ Группа удалена из списка разрешённых.")
     else:
@@ -280,12 +284,12 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ user_id должен быть числом.")
         return
 
-    if int(user_id) not in AUTHORIZED_USERS:
+    if int(user_id) not in authorized_users:
         await update.message.reply_text(f"ℹ️ Пользователь {user_id} не найден в списке.")
         return
 
     # Удаляем пользователя
-    AUTHORIZED_USERS.pop(int(user_id))
+    authorized_users.pop(int(user_id))
 
     # Сохраняем изменения
     save_auth_data()
@@ -303,19 +307,19 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = ["📋 Список авторизованных:"]
 
     # Список пользователей с именами, если есть
-    if AUTHORIZED_USERS:
+    if authorized_users:
         users_list = "\n".join(
             f"👤 {user_id}" + (f" (@{username})" if username else "")
-            for user_id, username in sorted(AUTHORIZED_USERS.items(), key=lambda x: int(x[0]))
+            for user_id, username in sorted(authorized_users.items(), key=lambda x: int(x[0]))
         )
-        message.append(f"\n🔹 Пользователи ({len(AUTHORIZED_USERS)}):\n{users_list}")
+        message.append(f"\n🔹 Пользователи ({len(authorized_users)}):\n{users_list}")
     else:
         message.append("\n🔹 Пользователи: список пуст")
 
     # Список групп
-    if AUTHORIZED_GROUPS:
-        groups_list = "\n".join(f"👥 {group_id}" for group_id in sorted(AUTHORIZED_GROUPS))
-        message.append(f"\n🔹 Группы ({len(AUTHORIZED_GROUPS)}):\n{groups_list}")
+    if authorized_groups:
+        groups_list = "\n".join(f"👥 {group_id}" for group_id in sorted(authorized_groups))
+        message.append(f"\n🔹 Группы ({len(authorized_groups)}):\n{groups_list}")
     else:
         message.append("\n🔹 Группы: список пуст")
 
@@ -327,11 +331,13 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global last_poweron_time, last_status_time, watchdog_job, job_queue
+    global last_poweron_time, last_status_time, watchdog_job, job_queue, active_chats
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
+
+    active_chats.add(update.effective_chat.id)
 
     now = time.time()
     if now - last_poweron_time < POWERON_COOLDOWN:
@@ -467,6 +473,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом статуса сервера.")
         return
+
+    active_chats.add(update.effective_chat.id)
 
     try:
 
