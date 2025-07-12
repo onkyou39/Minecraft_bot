@@ -42,7 +42,7 @@ load_dotenv()
 AUTHORIZED_FILE = "authorized.json"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-AUTHORIZED_CHAT_ID = int(os.getenv("AUTHORIZED_CHAT_ID"))
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
 
@@ -89,7 +89,7 @@ def is_authorized(chat_id: int) -> bool:
     return (
             chat_id in AUTHORIZED_USERS
             or chat_id in AUTHORIZED_GROUPS
-            or chat_id == AUTHORIZED_CHAT_ID
+            or chat_id == ADMIN_CHAT_ID
     )
 
 
@@ -113,7 +113,7 @@ async def get_server_status():
 async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
-    await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID, text=message)
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=message)
 
 
 async def watchdog_notifyer(message: str):
@@ -176,9 +176,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_name = update.effective_user.username or update.effective_user.full_name
 
-    await context.bot.send_message(chat_id=AUTHORIZED_CHAT_ID,
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID,
                                    text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
-    await update.message.reply_text("Бот запущен.")
+    await update.message.reply_text("👋 Бот запущен.")
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -198,7 +198,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может добавить группу.")
         return
 
@@ -213,7 +213,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/adduser")
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
 
@@ -248,7 +248,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может удалить группу.")
         return
 
@@ -263,7 +263,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @log_command("/removeuser")
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка прав администратора
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
         return
 
@@ -296,7 +296,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @log_command("/authorized")
 async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка прав администратора
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
         return
 
@@ -378,7 +378,10 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             last_poweron_time = now
             last_status_time = now
-            await notify_admin(update, context, "отправил запрос на включение сервера")
+
+            chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
+            if chat_type == 'private':
+                await notify_admin(update, context, "отправил запрос на включение сервера")
 
         else:
             await update.message.reply_text("❓ Не удалось определить состояние сервера.")
@@ -394,7 +397,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_poweroff_time, last_status_time, watchdog_job, job_queue  # Аналогично poweron
 
     # Проверка прав
-    if update.effective_user.id != AUTHORIZED_CHAT_ID:
+    if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
@@ -441,7 +444,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_poweroff_time = now
             last_status_time = now
 
-            await notify_admin(update, context, "отправил запрос на выключение сервера")
+            #await notify_admin(update, context, "отправил запрос на выключение сервера")
 
         else:
             await update.message.reply_text("❓ Не удалось определить состояние сервера.")
