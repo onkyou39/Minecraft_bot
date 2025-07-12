@@ -63,17 +63,20 @@ async def check_server_players(server_address: str, port: int):
 empty_since: Optional[float] = None  # Когда сервер стал пустым
 notified = False # Флаги для уведомлений
 is_fresh_start = True
+crashed = False # Сервер упал или ещё не запустился
 
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
-    global empty_since, notified, is_fresh_start
+    global empty_since, notified, is_fresh_start, crashed
     players = await check_server_players(SERVER_ADDRESS, QUERY_PORT)
     now = time.time()
 
-    if players is not None and is_fresh_start:
-        if notify_callback:
-            await notify_callback(f"✅ Minecraft сервер запущен.")
-        is_fresh_start = False
+    if players is not None:
+        crashed = False
+        if is_fresh_start:
+            if notify_callback:
+                await notify_callback(f"✅ Minecraft сервер запущен.")
+            is_fresh_start = False
 
     if players == 0:
         if empty_since is None:
@@ -82,8 +85,8 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         elif now - empty_since >= WD_POWEROFF_COOLDOWN:
             logger.warning("Watchdog: server remained empty, cooldown passed — shutting down VPS")
             if notify_callback:
-                await notify_callback(f"🛑 На сервере не было игроков больше {WD_POWEROFF_COOLDOWN // 60} минут."
-                                      f" Отправлена команда на выключение.")
+                await notify_callback(f"🔴 На сервере не было игроков больше {WD_POWEROFF_COOLDOWN // 60} минут."
+                                      f" Сервер выключен.")
             await shutdown_callback()
             empty_since = None  # Reset after shutdown
             notified = False  # сбрасываем флаг после выключения
@@ -97,7 +100,19 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
                                      # поправка на задержку вызова задачи
                 notified = True  # для однократного вывода
 
-    else:
+    elif players is not None:
         if empty_since is not None:
             logger.info("Watchdog: players joined — resetting shutdown timer")
             empty_since = None  # Reset timer because players are online
+            notified = False
+    else: # случай с падением minecraft или первым запуском.
+        if not is_fresh_start:
+            logger.warning("Watchdog: looks like minecraft server is crashed.")
+        else:
+            logger.info("Watchdog: Minecraft server is processing first startup.")
+        if notify_callback and not crashed and not is_fresh_start:
+            await notify_callback("⚠️ Minecraft сервер аварийно завершил работу, осуществляется перезапуск.")
+        elif notify_callback and not crashed and is_fresh_start:
+            await notify_callback("⏳ Запускается Minecraft сервер.")
+        crashed = True
+        empty_since = None #  сброс таймера до корректного восстановления работы
