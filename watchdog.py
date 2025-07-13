@@ -48,14 +48,16 @@ async def check_server_players(server_address: str, port: int):
     is_open = await fast_check(server_address, port, timeout=2)
     if is_open:
         try:
-            server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=5)
-            status = await server.async_status()  # Query-запрос
+            logger.debug("Watchdog: mcstatus trying async_lookup...")
+            server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=3)
+            logger.debug("Watchdog: mcstatus trying async_status...")
+            status = await asyncio.wait_for(server.async_status(), timeout=6)
             players_online = status.players.online
             logger.debug(f"Watchdog: ONLINE {players_online} players online.")
             return players_online
 
         except Exception as e:
-            logger.debug(f"Watchdog: OFFLINE Minecraft server unreachable. {e}")
+            logger.debug(f"Watchdog: OFFLINE Minecraft server unreachable. {type(e).__name__}: {e}")
             return None
     else:
         return None
@@ -63,7 +65,7 @@ async def check_server_players(server_address: str, port: int):
 empty_since: Optional[float] = None  # Когда сервер стал пустым
 notified = False # Флаги для уведомлений
 is_fresh_start = True
-crashed = False # Сервер упал или ещё не запустился
+crashed = 0 # Сервер упал или ещё не запустился.
 
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
@@ -73,10 +75,10 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
     now = time.time()
 
     if players is not None:
-        crashed = False
+        crashed = 0
         if is_fresh_start:
             if notify_callback:
-                await notify_callback("✅ Minecraft сервер запущен и доступен для подключения.")
+                await notify_callback("✅ Minecraft сервер доступен для подключения.")
             is_fresh_start = False
 
     if players == 0:
@@ -110,11 +112,11 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             logger.warning("Watchdog: looks like minecraft server is crashed or unreachable.")
         else:
             logger.info("Watchdog: Minecraft server is offline and probably starting.")
-        if notify_callback and not crashed and not is_fresh_start:
+        if notify_callback and crashed > 1 and not is_fresh_start:
             await notify_callback("⚠️ Minecraft сервер временно недоступен или аварийно завершил работу.")
             notified = False
             is_fresh_start = True # для вывода уведомления о запуске
-        elif notify_callback and not crashed and is_fresh_start:
+        elif notify_callback and crashed == 0 and is_fresh_start:
             await notify_callback("⏳ Minecraft сервер запускается...")
-        crashed = True
+        crashed += 1
         empty_since = None #  сброс таймера до корректного восстановления работы
