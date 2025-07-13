@@ -361,7 +361,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if watchdog_job is None:
             watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
-                                                   job_kwargs={'misfire_grace_time': 5})
+                                                   job_kwargs={'misfire_grace_time': 2})
             logger.info("Started watchdog job")
 
         if is_power_on is True:

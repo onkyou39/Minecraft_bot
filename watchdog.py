@@ -45,10 +45,10 @@ async def fast_check(host: str, port: int, timeout: float = 2.0):
         return None
 
 async def check_server_players(server_address: str, port: int):
-    is_open = await fast_check(server_address, port, timeout=1)
+    is_open = await fast_check(server_address, port, timeout=2)
     if is_open:
         try:
-            server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=3)
+            server = await JavaServer.async_lookup(f"{server_address}:{port}", timeout=5)
             status = await server.async_status()  # Query-запрос
             players_online = status.players.online
             logger.debug(f"Watchdog: ONLINE {players_online} players online.")
@@ -76,7 +76,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         crashed = False
         if is_fresh_start:
             if notify_callback:
-                await notify_callback(f"✅ Minecraft сервер запущен.")
+                await notify_callback("✅ Minecraft сервер запущен и доступен для подключения.")
             is_fresh_start = False
 
     if players == 0:
@@ -107,11 +107,11 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             notified = False
     else: # случай с падением minecraft или первым запуском.
         if not is_fresh_start:
-            logger.warning("Watchdog: looks like minecraft server is crashed.")
+            logger.warning("Watchdog: looks like minecraft server is crashed or unreachable.")
         else:
             logger.info("Watchdog: Minecraft server is offline and probably starting.")
         if notify_callback and not crashed and not is_fresh_start:
-            await notify_callback("⚠️ Minecraft сервер аварийно завершил работу.")
+            await notify_callback("⚠️ Minecraft сервер временно недоступен или аварийно завершил работу.")
             notified = False
             is_fresh_start = True # для вывода уведомления о запуске
         elif notify_callback and not crashed and is_fresh_start:
