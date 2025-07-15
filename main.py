@@ -185,6 +185,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Бот запущен.")
 
 
+STICKER_PACK_ID = "Yobba"
+STICKER_IDS = [
+"CAACAgIAAxkBAAE3z4lodieCM47W6bHinF93tjxkGRqDmQACKgEAAhIWYQqnJ3JCb4AUqDYE", 
+"CAACAgIAAxkBAAE3z_9odi8c9MbVLn3hs_hLG3fj4wLn5AACzgADEhZhCh-R7LyxoN4zNgQ",
+]
+
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #await update.message.reply_text(update.message.text)
     chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
@@ -193,7 +199,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """user_name = get_user_name(update)
     message_text = update.message.text
     logger.info(f"Message from {user_name}: {message_text}")"""
-    await update.message.reply_text(random.choice(["🌚", "🌝"]))
+    random_sticker = random.choice(STICKER_IDS)
+    await update.message.reply_sticker(random_sticker)
+#await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
 
 @log_command("/addgroup")
