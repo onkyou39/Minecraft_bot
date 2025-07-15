@@ -243,11 +243,11 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = context.args[1].lstrip("@") if len(context.args) == 2 else ""
 
-    if user_id in authorized_users:
+    if int(user_id) in authorized_users:
         await update.message.reply_text(f"ℹ️ Пользователь {user_id} уже в списке.")
         return
 
-    authorized_users[user_id] = username
+    authorized_users[int(user_id)] = username
     save_auth_data()
 
     await update.message.reply_text(
