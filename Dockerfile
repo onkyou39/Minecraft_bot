@@ -39,13 +39,14 @@ RUN adduser \
 #    python -m pip install -r requirements.txt
 
 COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
-
-# Switch to the non-privileged user to run the application.
-USER appuser
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy the source code into the container.
 COPY . .
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-privileged user to run the application.
+USER appuser
 
 # Expose the port that the application listens on.
 # EXPOSE 8000
