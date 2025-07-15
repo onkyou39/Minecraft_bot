@@ -193,15 +193,16 @@ STICKER_IDS = [
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #await update.message.reply_text(update.message.text)
-    chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
+    """chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
     if chat_type != 'private':
-        return  # Не отвечаем на некомандные сообщения в группе
+        return  # Не отвечаем на некомандные сообщения в группе"""
+
     """user_name = get_user_name(update)
     message_text = update.message.text
     logger.info(f"Message from {user_name}: {message_text}")"""
     random_sticker = random.choice(STICKER_IDS)
     await update.message.reply_sticker(random_sticker)
-#await update.message.reply_text(random.choice(["🌚", "🌝"]))
+    #await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
 
 @log_command("/addgroup")
