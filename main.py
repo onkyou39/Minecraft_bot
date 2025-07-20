@@ -379,7 +379,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                    job_kwargs={'misfire_grace_time': 2})
             logger.info("Started watchdog job")
 
-        if is_power_on is True:
+        if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
             last_status_time = now
             return
@@ -449,7 +449,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_status_time = now
             return
 
-        elif is_power_on is True:
+        elif is_power_on:
             # Отправка запроса на выключение
             result = await shutdown_vps()
 
@@ -500,7 +500,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
-        if is_power_on is True:
+        if is_power_on:
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
             players = await get_players_list()
             if players is not None:
