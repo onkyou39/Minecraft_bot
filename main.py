@@ -185,19 +185,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Бот запущен.")
 
 
-STICKER_PACK_ID = "Yobba"
-STICKER_IDS = [
-"CAACAgIAAxkBAAE3z4lodieCM47W6bHinF93tjxkGRqDmQACKgEAAhIWYQqnJ3JCb4AUqDYE", 
-"CAACAgIAAxkBAAE3z_9odi8c9MbVLn3hs_hLG3fj4wLn5AACzgADEhZhCh-R7LyxoN4zNgQ",
-"CAACAgIAAxkBAAE30dBodlRhY-fEYqe9JK9cvU7qH_1CWwACLgADEhZhCh35t0GGHuwUNgQ",
-"CAACAgIAAxkBAAE30dNodlSWqH2v0VfOyDRhCxLFkIczgwACRwADEhZhCrRQN4OAC7NgNgQ",
-"CAACAgIAAxkBAAE30dVodlSkh25IexHxy8993PW2kddXggACQQADEhZhCsA0AlL-qBT-NgQ",
-"CAACAgIAAxkBAAE30dlodlVdvCKXjmHqshQnMlsWWBQ2hwACkAADEhZhCrZOJci98N_TNgQ",
-"CAACAgIAAxkBAAE30dtodlWgCk4M8LoEDC7-y99EJYEhagACEwEAAhIWYQpLBK0xp4kFOzYE",
-"CAACAgIAAxkBAAE30d1odlW8VXM4X4_8mUXrYpgZeHzbBQACzAADEhZhCiZG0nB7WA-qNgQ",
-]
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sticker_pack_id = "Yobba"
+    sticker_ids = [
+        "CAACAgIAAxkBAAE3z4lodieCM47W6bHinF93tjxkGRqDmQACKgEAAhIWYQqnJ3JCb4AUqDYE",
+        "CAACAgIAAxkBAAE3z_9odi8c9MbVLn3hs_hLG3fj4wLn5AACzgADEhZhCh-R7LyxoN4zNgQ",
+        "CAACAgIAAxkBAAE30dBodlRhY-fEYqe9JK9cvU7qH_1CWwACLgADEhZhCh35t0GGHuwUNgQ",
+        "CAACAgIAAxkBAAE30dNodlSWqH2v0VfOyDRhCxLFkIczgwACRwADEhZhCrRQN4OAC7NgNgQ",
+        "CAACAgIAAxkBAAE30dVodlSkh25IexHxy8993PW2kddXggACQQADEhZhCsA0AlL-qBT-NgQ",
+        "CAACAgIAAxkBAAE30dlodlVdvCKXjmHqshQnMlsWWBQ2hwACkAADEhZhCrZOJci98N_TNgQ",
+        "CAACAgIAAxkBAAE30dtodlWgCk4M8LoEDC7-y99EJYEhagACEwEAAhIWYQpLBK0xp4kFOzYE",
+        "CAACAgIAAxkBAAE30d1odlW8VXM4X4_8mUXrYpgZeHzbBQACzAADEhZhCiZG0nB7WA-qNgQ",
+    ]
     #await update.message.reply_text(update.message.text)
     """chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
     if chat_type != 'private':
@@ -206,7 +206,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """user_name = get_user_name(update)
     message_text = update.message.text
     logger.info(f"Message from {user_name}: {message_text}")"""
-    random_sticker = random.choice(STICKER_IDS)
+    random_sticker = random.choice(sticker_ids)
     await update.message.reply_sticker(random_sticker)
     #await update.message.reply_text(random.choice(["🌚", "🌝"]))
 
