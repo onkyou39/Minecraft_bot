@@ -389,7 +389,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         is_power_on = server_status.get("IsPowerOn")
 
-        if watchdog_job is None:
+        if watchdog_job is None and not MAINTENANCE_MODE:
             watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
                                                    job_kwargs={'misfire_grace_time': 2})
             logger.info("Started watchdog job")
@@ -521,7 +521,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             players = await get_players_list()
             if players is not None:
                 await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов).")
-                if watchdog_job is None:
+                if watchdog_job is None and not MAINTENANCE_MODE:
                     watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10,
                                                            name="minecraft_watchdog")
                     logger.info("Started watchdog job")
@@ -543,7 +543,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/maintain")
 async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global MAINTENANCE_MODE
+    global MAINTENANCE_MODE, watchdog_job
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
@@ -551,6 +551,10 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     MAINTENANCE_MODE = not MAINTENANCE_MODE
 
     if MAINTENANCE_MODE:
+        if watchdog_job is not None:
+            watchdog_job.schedule_removal()
+            watchdog_job = None
+            logger.info("Removed watchdog job")
         await update.message.reply_text(f"🚧 Режим обслуживания включен.")
     else:
         await update.message.reply_text(f"🎮 Режим обслуживания выключен.")
