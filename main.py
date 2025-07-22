@@ -2,6 +2,8 @@ import logging
 import json
 import random
 import os
+from functools import wraps
+
 import aiohttp
 import time
 from dotenv import load_dotenv
@@ -45,6 +47,18 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
+
+
+MAINTENANCE_MODE = False
+
+def check_maintenance(func):
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if MAINTENANCE_MODE and update.effective_user.id != ADMIN_CHAT_ID:
+            await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте позже!")
+            return None
+        return await func(update, context)
+    return wrapper
 
 # Время последнего успешного запуска VPS (в секундах с эпохи)
 last_poweron_time = 0
@@ -344,6 +358,7 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("".join(message))
 
 
+@check_maintenance
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_poweron_time, last_status_time, watchdog_job, job_queue, active_chats
@@ -476,6 +491,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
 
+@check_maintenance
 @log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_status_time, watchdog_job
@@ -525,6 +541,21 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
 
+@log_command("/maintain")
+async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global MAINTENANCE_MODE
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
+        return
+
+    MAINTENANCE_MODE = not MAINTENANCE_MODE
+
+    if MAINTENANCE_MODE:
+        await update.message.reply_text(f"🚧 Режим обслуживания включен.")
+    else:
+        await update.message.reply_text(f"🎮 Режим обслуживания выключен.")
+
+
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     if job_queue is None:
@@ -538,6 +569,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("adduser", adduser))
     application.add_handler(CommandHandler("removeuser", removeuser))
     application.add_handler(CommandHandler("authorized", list_authorized))
+    application.add_handler(CommandHandler("maintain", maintenance))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
     application.run_polling(poll_interval=1, timeout=30)
