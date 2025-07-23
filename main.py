@@ -169,21 +169,33 @@ async def api_request(action: str):
         return {"error": f"Connection error: {str(e)}"}
 
 
+def watchdog_stop():
+    global watchdog_job
+    if watchdog_job is not None:
+        watchdog_job.schedule_removal()
+        watchdog_job = None
+        logger.info("Removed watchdog job")
+
 async def shutdown_vps():
     now = time.time()
     active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
     global last_poweron_time, watchdog_job
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу watchdog
-    if watchdog_job is not None:
-        watchdog_job.schedule_removal()
-        watchdog_job = None
-        logger.info("Removed watchdog job")
+    watchdog_stop()
     return await api_request("ShutDownGuestOS")
 
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # Стандартная сигнатура для job_queue
     await watchdog_tick(shutdown_vps, watchdog_notifyer)
+
+
+def watchdog_run():
+    global watchdog_job
+    if watchdog_job is None and not MAINTENANCE_MODE:
+        watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
+                                               job_kwargs={'misfire_grace_time': 2})
+        logger.info("Started watchdog job")
 
 
 @log_command("/start")
@@ -361,7 +373,7 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @check_maintenance
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global last_poweron_time, last_status_time, watchdog_job, job_queue, active_chats
+    global last_poweron_time, last_status_time, active_chats
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
@@ -370,10 +382,6 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active_chats.add(update.effective_chat.id)
 
     now = time.time()
-    if now - last_poweron_time < POWERON_COOLDOWN:
-        remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным включением сервера.")
-        return
 
     if now - last_status_time < STATUS_COOLDOWN:
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
@@ -387,25 +395,27 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
+
         is_power_on = server_status.get("IsPowerOn")
-
-        if watchdog_job is None and not MAINTENANCE_MODE:
-            watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
-                                                   job_kwargs={'misfire_grace_time': 2})
-            logger.info("Started watchdog job")
-
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
+            watchdog_run()
             last_status_time = now
             return
-
         elif is_power_on is False:
+            if now - last_poweron_time < POWERON_COOLDOWN:
+                remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
+                await update.message.reply_text(f"⏳ Подождите {(remaining / 60):.2f} минут(у)"
+                                                f" перед повторным включением сервера.")
+                return
             # Отправка запроса на включение
             result = await api_request("PowerOn")
 
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
                 return
+
+            watchdog_run()
 
             state = result.get("State", "Unknown")
             if state == "InProgress":
@@ -431,7 +441,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @log_command("/poweroff")
 async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /poweroff"""
-    global last_poweroff_time, last_status_time, watchdog_job, job_queue  # Аналогично poweron
+    global last_poweroff_time, last_status_time  # Аналогично poweron
 
     # Проверка прав
     if update.effective_user.id != ADMIN_CHAT_ID:
@@ -494,7 +504,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @check_maintenance
 @log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global last_status_time, watchdog_job
+    global last_status_time
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
@@ -521,18 +531,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             players = await get_players_list()
             if players is not None:
                 await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов).")
-                if watchdog_job is None and not MAINTENANCE_MODE:
-                    watchdog_job = job_queue.run_repeating(watchdog_task, interval=60, first=10,
-                                                           name="minecraft_watchdog")
-                    logger.info("Started watchdog job")
+                watchdog_run()
             else:
                 await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
         elif is_power_on is False:
             await update.message.reply_text("🔴 Сервер выключен.")
-            if watchdog_job is not None:
-                watchdog_job.schedule_removal()
-                watchdog_job = None
-                logger.info("Removed watchdog job")
+            watchdog_stop()
         else:
             await update.message.reply_text("❓ Не удалось определить состояние сервера.")
 
@@ -543,7 +547,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/maintain")
 async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global MAINTENANCE_MODE, watchdog_job
+    global MAINTENANCE_MODE
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
@@ -551,10 +555,7 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     MAINTENANCE_MODE = not MAINTENANCE_MODE
 
     if MAINTENANCE_MODE:
-        if watchdog_job is not None:
-            watchdog_job.schedule_removal()
-            watchdog_job = None
-            logger.info("Removed watchdog job")
+        watchdog_stop()
         await update.message.reply_text(f"🚧 Режим обслуживания включен.")
     else:
         await update.message.reply_text(f"🎮 Режим обслуживания выключен.")
