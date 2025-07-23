@@ -21,7 +21,7 @@ logging.basicConfig(
 
 
 logger = logging.getLogger("watchdog")
-logging.getLogger("watchdog").setLevel(logging.DEBUG)
+logging.getLogger("watchdog").setLevel(logging.INFO)
 
 async def get_players_list():
     return await check_server_players(SERVER_ADDRESS, QUERY_PORT)
