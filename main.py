@@ -55,7 +55,7 @@ def check_maintenance(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
         if MAINTENANCE_MODE and update.effective_user.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте позже!")
+            await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте позже.")
             return None
         return await func(update, context)
     return wrapper
