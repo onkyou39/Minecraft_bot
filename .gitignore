@@ -2,6 +2,7 @@
 /.idea/
 /authorized.json
 /.venv
+/.pytest_cache
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
