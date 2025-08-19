@@ -9,7 +9,7 @@ import time
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Job, JobQueue
-from watchdog import watchdog_tick, get_players_list
+from watchdog import watchdog_tick, get_players_list, reset_watchdog_state
 from typing import Optional
 
 # Enable logging
@@ -54,8 +54,8 @@ MAINTENANCE_MODE = False
 def check_maintenance(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
-        if MAINTENANCE_MODE and update.effective_user.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте позже.")
+        if MAINTENANCE_MODE:
+            await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте выполнить запрос позже.")
             return None
         return await func(update, context)
     return wrapper
@@ -66,7 +66,7 @@ last_poweroff_time = 0
 # Время последнего запроса статуса сервера
 last_status_time = 0
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
-POWEROFF_COOLDOWN = 5 * 60 # 5 минут
+POWEROFF_COOLDOWN = 1 * 60 # 1 минута
 STATUS_COOLDOWN = 5  # запрос статуса
 
 watchdog_job: Optional[Job] = None
@@ -181,8 +181,9 @@ async def shutdown_vps():
     active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
     global last_poweron_time, watchdog_job
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
-    # после выключения VPS сбрасываем задачу watchdog
+    # после выключения VPS сбрасываем задачу и состояние watchdog
     watchdog_stop()
+    reset_watchdog_state()
     return await api_request("ShutDownGuestOS")
 
 
