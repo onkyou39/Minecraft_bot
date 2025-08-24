@@ -527,7 +527,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ig
             return
         last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
-        if is_power_on:
+        if is_power_on and not context.chat_data.get("muted", False):
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
             players = await get_players_list()
             if players is not None:
@@ -536,7 +536,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ig
             else:
                 await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
         elif is_power_on is False:
-            active_chats.clear() # сброс активного чата при выключенном сервере
+            active_chats.clear() # сброс активных чатов при выключенном сервере
             await update.message.reply_text("🔴 Сервер выключен.")
             watchdog_stop()
         else:
@@ -558,9 +558,26 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE): # typ
 
     if MAINTENANCE_MODE:
         watchdog_stop()
-        await update.message.reply_text(f"🚧 Режим обслуживания включен.")
+        await update.message.reply_text("🚧 Режим обслуживания включен.")
     else:
-        await update.message.reply_text(f"🎮 Режим обслуживания выключен.")
+        await update.message.reply_text("🎮 Режим обслуживания выключен.")
+
+@log_command("/mute")
+async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+    if not is_authorized(update.effective_chat.id):
+        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
+        return
+
+    is_muted = context.chat_data.get("muted", False)
+    context.chat_data["muted"] = not is_muted
+
+    if context.chat_data["muted"]:
+        active_chats.discard(update.effective_chat.id)
+        await update.message.reply_text("🔇 Уведомления в этом чате выключены до перезапуска сервера.")
+    else:
+        active_chats.add(update.effective_chat.id)
+        await update.message.reply_text("🔔 Уведомления включены.")
+
 
 
 if __name__ == "__main__":
@@ -577,6 +594,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("removeuser", removeuser))
     application.add_handler(CommandHandler("authorized", list_authorized))
     application.add_handler(CommandHandler("maintain", maintenance))
+    application.add_handler(CommandHandler("mute", mute))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
     application.run_polling(poll_interval=1, timeout=30)
