@@ -536,6 +536,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ig
             else:
                 await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
         elif is_power_on is False:
+            active_chats.clear() # сброс активного чата при выключенном сервере
             await update.message.reply_text("🔴 Сервер выключен.")
             watchdog_stop()
         else:
