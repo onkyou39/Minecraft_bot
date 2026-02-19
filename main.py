@@ -406,8 +406,11 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
         elif is_power_on is False:
             if now - last_poweron_time < POWERON_COOLDOWN:
                 remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
-                await update.message.reply_text(f"⏳ Подождите {(remaining / 60):.2f} минут(у)"
-                                                f" перед повторным включением сервера.")
+                await update.message.reply_text(
+                    f"⏳ Подождите {remaining if remaining < 60 else f'{(remaining / 60):.0f}'} "
+                    f"{'секунд' if remaining < 60 else 'минут(у)'} "
+                    f"перед повторным включением сервера."
+                )
                 return
             # Отправка запроса на включение
             result = await api_request("PowerOn")
