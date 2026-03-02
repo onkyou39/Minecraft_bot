@@ -384,7 +384,15 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
     now = time.time()
 
-    if now - last_status_time < STATUS_COOLDOWN:
+    if len(context.args) == 1 and context.args[0] == "force":
+        if update.effective_user.id != ADMIN_CHAT_ID:
+            await update.message.reply_text("⛔ Недостаточно прав для принудительного включения.")
+            return
+    elif context.args:
+        await update.message.reply_text("⚠️ Неправильно введённая команда.")
+        return
+
+    if now - last_status_time < STATUS_COOLDOWN and not context.args:
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом.")
         return
