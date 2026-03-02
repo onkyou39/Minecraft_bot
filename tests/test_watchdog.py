@@ -6,7 +6,7 @@ from watchdog import watchdog_tick, MINECRAFT_SERVER, WATCHDOG_STATE
 async def test_online_with_players(monkeypatch):
     state = {"notified": False, "shutdown": False}
 
-    async def check_server_players(server, port):
+    async def check_server_players():
         return 3  # игроки есть
 
     async def notify_cb(msg): state["notified"] = msg
@@ -27,7 +27,7 @@ async def test_online_with_players(monkeypatch):
 async def test_empty_server_timer_not_expired(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players(server, port):
+    async def check_server_players():
         return 0
 
     async def notify_cb(msg): state["notified"] = msg
@@ -50,7 +50,7 @@ async def test_empty_server_timer_not_expired(monkeypatch):
 async def test_empty_server_shutdown(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players(server, port):
+    async def check_server_players():
         return 0
 
     async def notify_cb(msg): state["notified"] = msg
@@ -73,7 +73,7 @@ async def test_server_crashed(monkeypatch):
     state = {"notified": None, "shutdown": False}
     crashes = {"count": 2}
 
-    async def check_server_players(server, port):
+    async def check_server_players():
         return None  # сервер упал
 
     async def notify_cb(msg): state["notified"] = msg
@@ -94,7 +94,7 @@ async def test_server_crashed(monkeypatch):
 async def test_first_start(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players(server, port):
+    async def check_server_players():
         return None  # сервер недоступен, первый запуск
 
     async def notify_cb(msg): state["notified"] = msg
