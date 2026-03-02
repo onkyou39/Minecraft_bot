@@ -4,6 +4,7 @@ import time
 import os
 from dotenv import load_dotenv
 from mcstatus import JavaServer
+from re import search
 from typing import Optional
 from dataclasses import dataclass, fields
 
@@ -16,6 +17,7 @@ class MinecraftServer:
     check_interval: int = 60  # секунд между проверками
     wd_poweroff_cooldown: int = 10 * 60  # 10 минут
     version: str = ""
+    version_number: str = ""
 
 MINECRAFT_SERVER = MinecraftServer()
 
@@ -62,6 +64,8 @@ async def get_server_status(server_address: str = MINECRAFT_SERVER.server_addres
             logger.debug(f"Watchdog: ONLINE Successfully get Minecraft server status.")
             if not MINECRAFT_SERVER.version:
                 MINECRAFT_SERVER.version = status.version.name
+                MINECRAFT_SERVER.version_number = (search(r"([0-9]+(\.[0-9]+)+)",
+                           MINECRAFT_SERVER.version)).group(1)
             return status
 
         except Exception as e:
@@ -110,7 +114,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         if WATCHDOG_STATE.is_fresh_start:
             if notify_callback:
                 await notify_callback(f"✅ Minecraft сервер доступен для подключения."
-                                      f"\nВерсия сервера: {MINECRAFT_SERVER.version}")
+                                      f"\nВерсия сервера: {MINECRAFT_SERVER.version_number}")
             WATCHDOG_STATE.is_fresh_start = False
 
     if players == 0:
