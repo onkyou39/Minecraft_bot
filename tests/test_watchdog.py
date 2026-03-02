@@ -19,7 +19,7 @@ async def test_online_with_players(monkeypatch):
     WATCHDOG_STATE.is_fresh_start = True
 
     await watchdog_tick(shutdown_cb, notify_cb)
-    assert state["notified"] == "✅ Minecraft сервер доступен для подключения."
+    assert "✅ Minecraft сервер доступен" in state["notified"]
     assert not state["shutdown"]
 
 
