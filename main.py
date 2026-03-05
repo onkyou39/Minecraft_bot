@@ -375,14 +375,11 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE): #
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
     global last_poweron_time, last_status_time, active_chats
+    now = time.time()
 
     if not is_authorized(update.effective_chat.id):
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
-
-    active_chats.add(update.effective_chat.id)
-
-    now = time.time()
 
     if len(context.args) == 1 and context.args[0] == "force":
         if update.effective_user.id != ADMIN_CHAT_ID:
@@ -404,7 +401,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-
+        active_chats.add(update.effective_chat.id) # Вывод уведомлений о статусе сервера в текущий чат
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
@@ -412,7 +409,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
             last_status_time = now
             return
         elif is_power_on is False:
-            if now - last_poweron_time < POWERON_COOLDOWN:
+            if now - last_poweron_time < POWERON_COOLDOWN and not context.args:
                 remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
                 await update.message.reply_text(
                     f"⏳ Подождите {remaining if remaining < 60 else f'{(remaining / 60):.0f}'} "
@@ -425,6 +422,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
+                active_chats.discard(update.effective_chat.id) # Сброс уведомлений при ошибке
                 return
 
             watchdog_run()
