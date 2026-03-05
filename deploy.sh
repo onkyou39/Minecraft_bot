@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e  # Exit on error
 
+if [[ $EUID -ne 0 ]]; then
+  echo "❗ This script must be run as root"
+  exit 1
+fi
+
 CONTAINER_NAME="minecraft-bot"
 IMAGE_NAME="minecraft-bot:latest"
 
