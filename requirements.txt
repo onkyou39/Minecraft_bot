@@ -1,10 +1,10 @@
-﻿aiohappyeyeballs==2.6.1
+aiohappyeyeballs==2.6.1
 aiohttp==3.13.3
 aiosignal==1.4.0
 anyio==4.12.1
 APScheduler==3.11.2
 asyncio-dgram==3.0.0
-attrs==25.4.0
+attrs==26.1.0
 certifi==2026.1.4
 dnspython==2.8.0
 frozenlist==1.8.0
