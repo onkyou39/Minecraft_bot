@@ -8,11 +8,11 @@ updates:
   - package-ecosystem: "pip" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "quarterly"
+      interval: "semiannually"
     groups:
       production-dependencies:
         dependency-type: "production"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "quarterly"
+      interval: "semiannually"
