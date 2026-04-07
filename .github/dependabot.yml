@@ -9,6 +9,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "quarterly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
