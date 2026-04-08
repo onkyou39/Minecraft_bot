@@ -4,7 +4,7 @@
 3. Add values to .env file
 4. Configure and run deploy.sh script
 
-Alternatively you can manually build and start Docker container using commands provided below. Parameters in square brackets are optional
+Alternatively you can manually build and start Docker container using commands provided below. Parameters in square brackets are optional.
 ##### Building and running Docker image
 ```shell
 sudo docker build -t minecraft-bot .
