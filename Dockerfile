@@ -6,8 +6,9 @@
 
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
-ARG PYTHON_VERSION=3.13.6
-FROM python:${PYTHON_VERSION}-slim AS base
+#ARG PYTHON_VERSION=3.13.6
+#FROM python:${PYTHON_VERSION}-slim AS base
+FROM python:3.13.6-slim AS base
 
 # Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
