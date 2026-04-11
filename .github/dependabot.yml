@@ -16,3 +16,6 @@ updates:
     directory: "/"
     schedule:
       interval: "semiannually"
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
