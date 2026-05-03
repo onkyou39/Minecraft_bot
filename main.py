@@ -44,7 +44,7 @@ load_dotenv()
 AUTHORIZED_FILE = "authorized.json"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID")) # type: ignore
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
 
@@ -120,7 +120,7 @@ async def get_server_status():
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(API_URL, headers=headers) as response:
+        async with session.get(API_URL, headers=headers) as response: # type: ignore
             if response.status == 200:
                 return await response.json()
             return {"error": f"{response.status}: {await response.text()}"}
@@ -314,7 +314,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE): # type
         return
 
     # Проверка наличия ровно одного аргумента
-    if len(context.args) != 1:
+    if len(context.args) != 1: # type: ignore
         await update.message.reply_text(
             "ℹ️ Использование: /removeuser user_id\n"
             "Пример: /removeuser 12345"
@@ -381,7 +381,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
-    if len(context.args) == 1 and context.args[0] == "force":
+    if len(context.args) == 1 and context.args[0] == "force": # type: ignore
         if update.effective_user.id != ADMIN_CHAT_ID:
             await update.message.reply_text("⛔ Недостаточно прав для принудительного включения.")
             return
@@ -589,7 +589,7 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: igno
 
 
 if __name__ == "__main__":
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build() # type: ignore
     if job_queue is None:
         job_queue = application.job_queue
     application.add_handler(CommandHandler("start", start))
