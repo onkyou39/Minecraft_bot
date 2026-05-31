@@ -3,13 +3,13 @@ import json
 import random
 import os
 from functools import wraps
-
 import aiohttp
 import time
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Job, JobQueue
-from watchdog import watchdog_tick, get_players_list, reset_watchdog_state
+from watchdog import watchdog_tick, reset_watchdog_state
+from minecraft_server import mc_server
 from typing import Optional
 
 # Enable logging
@@ -60,11 +60,23 @@ def check_maintenance(func):
         return await func(update, context)
     return wrapper
 
+def check_permissions(func):
+    """Декоратор проверки прав доступа"""
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
+            return None
+        return await func(update, context)
+    return wrapper
+
 # Время последнего успешного запуска VPS (в секундах с эпохи)
 last_poweron_time = 0
 last_poweroff_time = 0
 # Время последнего запроса статуса сервера
 last_status_time = 0
+# Кэшированный статус Minecraft-сервера
+mc_server.online = False
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
 POWEROFF_COOLDOWN = 1 * 60 # 1 минута
 STATUS_COOLDOWN = 5  # запрос статуса
@@ -177,9 +189,10 @@ def watchdog_stop():
         logger.info("Removed watchdog job")
 
 async def shutdown_vps():
-    now = time.time()
-    active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
     global last_poweron_time, watchdog_job
+    now = time.time()
+    mc_server.online = False # Minecraft сервер неактивен при полном выключении VPS
+    active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу и состояние watchdog
     watchdog_stop()
@@ -372,14 +385,11 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE): #
 
 
 @check_maintenance
+@check_permissions
 @log_command("/poweron")
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
     global last_poweron_time, last_status_time, active_chats
     now = time.time()
-
-    if not is_authorized(update.effective_chat.id):
-        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
-        return
 
     if len(context.args) == 1 and context.args[0] == "force": # type: ignore
         if update.effective_user.id != ADMIN_CHAT_ID:
@@ -512,13 +522,10 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: 
 
 
 @check_maintenance
+@check_permissions
 @log_command("/status")
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
     global last_status_time
-
-    if not is_authorized(update.effective_chat.id):
-        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
-        return
 
     now = time.time()
     if now - last_status_time < STATUS_COOLDOWN:
@@ -538,14 +545,15 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ig
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on and not context.chat_data.get("muted", False):
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
-            players = await get_players_list()
-            if players is not None:
-                await update.message.reply_text(f"🟢 Сервер включен. На сервере {players} игрок(ов).")
+            if mc_server.online:
+                await update.message.reply_text(f"🟢 Сервер включен. На сервере {mc_server.players_online} игрок(ов).")
                 watchdog_run()
             else:
                 await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
+                mc_server.online = False
         elif is_power_on is False:
             await update.message.reply_text("🔴 Сервер выключен.")
+            mc_server.online = False
             watchdog_stop()
         else:
             await update.message.reply_text("❓ Не удалось определить состояние сервера.")
@@ -570,11 +578,9 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE): # typ
     else:
         await update.message.reply_text("🎮 Режим обслуживания выключен.")
 
+@check_permissions
 @log_command("/mute")
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
-    if not is_authorized(update.effective_chat.id):
-        await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
-        return
 
     is_muted = context.chat_data.get("muted", False)
     context.chat_data["muted"] = not is_muted
@@ -586,6 +592,15 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: igno
         active_chats.add(update.effective_chat.id)
         await update.message.reply_text("🔔 Уведомления включены.")
 
+
+@check_permissions
+@log_command("/version")
+async def get_cached_mc_version(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Хендлер вывода текущей версии Minecraft сервера без запроса к API"""
+    if mc_server.version:
+        await update.message.reply_text(f"ℹ️ Версия Minecraft сервера: {mc_server.version_number}")
+    else:
+        await update.message.reply_text("ℹ️ Версия Minecraft сервера неизвестна.")
 
 
 if __name__ == "__main__":
@@ -603,6 +618,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("authorized", list_authorized))
     application.add_handler(CommandHandler("maintain", maintenance))
     application.add_handler(CommandHandler("mute", mute))
+    application.add_handler(CommandHandler("version", get_cached_mc_version))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, echo))
     #application.add_handler(MessageHandler(filters.ALL, log_all), group=0) # для логирования всего
     application.run_polling(poll_interval=1, timeout=30)
