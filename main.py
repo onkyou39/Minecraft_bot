@@ -597,10 +597,10 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: igno
 @log_command("/version")
 async def get_cached_mc_version(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Хендлер вывода текущей версии Minecraft сервера без запроса к API"""
-    if mc_server.version:
+    if mc_server.version and mc_server.online:
         await update.message.reply_text(f"ℹ️ Версия Minecraft сервера: {mc_server.version_number}")
     else:
-        await update.message.reply_text("ℹ️ Версия Minecraft сервера неизвестна.")
+        await update.message.reply_text("ℹ️ Версия Minecraft сервера неизвестна или сервер не запущен.")
 
 
 if __name__ == "__main__":
