@@ -36,8 +36,8 @@ async def fast_check(host: str, port: int, timeout: float = 2.0):
         logger.exception(f"Watchdog: port fast check — unknown exception: {e}")
         return None
 
-async def get_server_status(server_address: str = mc_server.server_address,
-                            port: int = mc_server.query_port):
+async def get_mc_server_status(server_address: str = mc_server.server_address,
+                               port: int = mc_server.query_port):
     is_open = await fast_check(server_address, port, timeout=2)
     if is_open:
         try:
@@ -87,7 +87,7 @@ def reset_watchdog_state():
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
     logger.debug("Watchdog tick.")
-    await get_server_status()
+    await get_mc_server_status()
     now = time.time()
 
     if mc_server.online:

@@ -8,7 +8,7 @@ import time
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, Job, JobQueue
-from watchdog import watchdog_tick, reset_watchdog_state
+from watchdog import watchdog_tick, reset_watchdog_state, get_mc_server_status
 from minecraft_server import mc_server
 from typing import Optional
 
@@ -130,7 +130,7 @@ def get_user_name(update: Update) -> str:
     return update.effective_user.username or update.effective_user.full_name or "Неизвестный пользователь"
 
 
-async def get_server_status():
+async def get_vps_server_status():
     headers = {
         "Authorization": f"Bearer {API_TOKEN}",
         "Content-Type": "application/json"
@@ -410,8 +410,10 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         return
 
     try:
-        # Запрос текущего статуса
-        server_status = await get_server_status()
+        # Запрос текущего статуса VPS
+        server_status = await get_vps_server_status()
+        # Запрос текущего статуса Minecraft
+        await get_mc_server_status()
 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
@@ -487,7 +489,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
     try:
         # Запрос текущего статуса
-        server_status = await get_server_status()
+        server_status = await get_vps_server_status()
 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
@@ -540,8 +542,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
 
     try:
 
-        # Запрос текущего статуса
-        server_status = await get_server_status()
+        # Запрос текущего статуса VPS сервера
+        server_status = await get_vps_server_status()
 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
