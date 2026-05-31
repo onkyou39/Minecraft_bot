@@ -6,13 +6,15 @@ from watchdog import watchdog_tick, mc_server, watchdog_state
 async def test_online_with_players(monkeypatch):
     state = {"notified": False, "shutdown": False}
 
-    async def check_server_players():
-        return 3  # игроки есть
+    # игроки есть
+    async def mock_get_server_status():
+        mc_server.online = True
+        mc_server.players_online = 3
 
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.check_server_players", check_server_players)
+    monkeypatch.setattr("watchdog.get_server_status", mock_get_server_status)
 
     # Сбрасываем состояние датакласса перед тестом
     watchdog_state.reset()
@@ -27,13 +29,14 @@ async def test_online_with_players(monkeypatch):
 async def test_empty_server_timer_not_expired(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players():
-        return 0
+    async def mock_get_server_status():
+        mc_server.online = True
+        mc_server.players_online = 0
 
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.check_server_players", check_server_players)
+    monkeypatch.setattr("watchdog.get_server_status", mock_get_server_status)
 
     # Подготавливаем состояние датакласса
     watchdog_state.reset()
@@ -50,13 +53,14 @@ async def test_empty_server_timer_not_expired(monkeypatch):
 async def test_empty_server_shutdown(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players():
-        return 0
+    async def mock_get_server_status():
+        mc_server.online = True
+        mc_server.players_online = 0
 
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.check_server_players", check_server_players)
+    monkeypatch.setattr("watchdog.get_server_status", mock_get_server_status)
 
     watchdog_state.reset()
     watchdog_state.empty_since = time.time() - mc_server.wd_poweroff_cooldown - 5
@@ -73,13 +77,15 @@ async def test_server_crashed(monkeypatch):
     state = {"notified": None, "shutdown": False}
     crashes = {"count": 2}
 
-    async def check_server_players():
-        return None  # сервер упал
+    # сервер упал
+    async def mock_get_server_status():
+        mc_server.online = False
+        mc_server.players_online = None
 
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.check_server_players", check_server_players)
+    monkeypatch.setattr("watchdog.get_server_status", mock_get_server_status)
 
     watchdog_state.reset()
     watchdog_state.crashed = crashes["count"]
@@ -94,13 +100,16 @@ async def test_server_crashed(monkeypatch):
 async def test_first_start(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
-    async def check_server_players():
-        return None  # сервер недоступен, первый запуск
+    # сервер недоступен, первый запуск
+    async def mock_get_server_status():
+        mc_server.online = False
+        mc_server.players_online = None
+
 
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.check_server_players", check_server_players)
+    monkeypatch.setattr("watchdog.get_server_status", mock_get_server_status)
 
     watchdog_state.reset()
     watchdog_state.crashed = 0
