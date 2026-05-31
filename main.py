@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def log_command(command_name):
     def decorator(func):
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs): # type: ignore
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):  # type: ignore
             logger.info(f"{get_user_name(update)} sent COMMAND {command_name}")
             return await func(update, context, *args, **kwargs)
 
@@ -44,31 +44,36 @@ load_dotenv()
 AUTHORIZED_FILE = "authorized.json"
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID")) # type: ignore
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))  # type: ignore
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
 
-
 MAINTENANCE_MODE = False
+
 
 def check_maintenance(func):
     @wraps(func)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
         if MAINTENANCE_MODE:
             await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте выполнить запрос позже.")
             return None
         return await func(update, context)
+
     return wrapper
+
 
 def check_permissions(func):
     """Декоратор проверки прав доступа"""
+
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_authorized(update.effective_chat.id):
             await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
             return None
         return await func(update, context)
+
     return wrapper
+
 
 # Время последнего успешного запуска VPS (в секундах с эпохи)
 last_poweron_time = 0
@@ -78,13 +83,13 @@ last_status_time = 0
 # Кэшированный статус Minecraft-сервера
 mc_server.online = False
 POWERON_COOLDOWN = 20 * 60  # 20 минут в секундах
-POWEROFF_COOLDOWN = 1 * 60 # 1 минута
+POWEROFF_COOLDOWN = 1 * 60  # 1 минута
 STATUS_COOLDOWN = 5  # запрос статуса
 
 watchdog_job: Optional[Job] = None
 job_queue: Optional[JobQueue] = None
 
-active_chats = set() # Список чатов, в которые шлются уведомления
+active_chats = set()  # Список чатов, в которые шлются уведомления
 
 
 def load_auth_data():
@@ -132,13 +137,13 @@ async def get_server_status():
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(API_URL, headers=headers) as response: # type: ignore
+        async with session.get(API_URL, headers=headers) as response:  # type: ignore
             if response.status == 200:
                 return await response.json()
             return {"error": f"{response.status}: {await response.text()}"}
 
 
-async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str): # type: ignore
+async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):  # type: ignore
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=message)
@@ -149,13 +154,13 @@ async def watchdog_notifyer(message: str):
         #for chat_id in list(authorized_groups.union(authorized_users.keys())):
         for chat_id in active_chats:
             if chat_id:
-                await application.bot.send_message(chat_id=chat_id, text=message) # type: ignore
+                await application.bot.send_message(chat_id=chat_id, text=message)  # type: ignore
         notify_logger.debug(f"Watchdog sent notification: {message}")
     except Exception as e:
         notify_logger.debug(f"Watchdog notification failed: {str(e)}")
 
 
-async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     user_name = get_user_name(update)
     message = update.message
     if message:
@@ -188,11 +193,12 @@ def watchdog_stop():
         watchdog_job = None
         logger.info("Removed watchdog job")
 
+
 async def shutdown_vps():
     global last_poweron_time, watchdog_job
     now = time.time()
-    mc_server.online = False # Minecraft сервер неактивен при полном выключении VPS
-    active_chats.clear() # сброс активных чатов для уведомлений после выключения сервера
+    mc_server.online = False  # Minecraft сервер неактивен при полном выключении VPS
+    active_chats.clear()  # сброс активных чатов для уведомлений после выключения сервера
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу и состояние watchdog
     watchdog_stop()
@@ -200,7 +206,7 @@ async def shutdown_vps():
     return await api_request("ShutDownGuestOS")
 
 
-async def watchdog_task(context: ContextTypes.DEFAULT_TYPE): # type: ignore # Стандартная сигнатура для job_queue
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue
     await watchdog_tick(shutdown_vps, watchdog_notifyer)
 
 
@@ -213,7 +219,7 @@ def watchdog_run():
 
 
 @log_command("/start")
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
     if chat_type != 'private':
         return  # Не отвечаем на start в группе
@@ -225,8 +231,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ign
     await update.message.reply_text("👋 Бот запущен.")
 
 
-
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     sticker_pack_id = "Yobba"
     sticker_ids = [
         "CAACAgIAAxkBAAE3z4lodieCM47W6bHinF93tjxkGRqDmQACKgEAAhIWYQqnJ3JCb4AUqDYE",
@@ -252,7 +257,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: igno
 
 
 @log_command("/addgroup")
-async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     if update.effective_chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
@@ -271,7 +276,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: 
 
 
 @log_command("/adduser")
-async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
@@ -302,7 +307,7 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
 
 @log_command("/removegroup")
-async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     if update.effective_chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
@@ -320,14 +325,14 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE): # typ
 
 
 @log_command("/removeuser")
-async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
         return
 
     # Проверка наличия ровно одного аргумента
-    if len(context.args) != 1: # type: ignore
+    if len(context.args) != 1:  # type: ignore
         await update.message.reply_text(
             "ℹ️ Использование: /removeuser user_id\n"
             "Пример: /removeuser 12345"
@@ -353,7 +358,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE): # type
 
 
 @log_command("/authorized")
-async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
@@ -387,11 +392,11 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE): #
 @check_maintenance
 @check_permissions
 @log_command("/poweron")
-async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     global last_poweron_time, last_status_time, active_chats
     now = time.time()
 
-    if len(context.args) == 1 and context.args[0] == "force": # type: ignore
+    if len(context.args) == 1 and context.args[0] == "force":  # type: ignore
         if update.effective_user.id != ADMIN_CHAT_ID:
             await update.message.reply_text("⛔ Недостаточно прав для принудительного включения.")
             return
@@ -401,7 +406,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
     if now - last_status_time < STATUS_COOLDOWN and not context.args:
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом.")
+        await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
     try:
@@ -411,7 +416,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-        active_chats.add(update.effective_chat.id) # Вывод уведомлений о статусе сервера в текущий чат
+        active_chats.add(update.effective_chat.id)  # Вывод уведомлений о статусе сервера в текущий чат
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
@@ -423,7 +428,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
                 remaining = int(POWERON_COOLDOWN - (now - last_poweron_time))
                 await update.message.reply_text(
                     f"⏳ Подождите {remaining if remaining < 60 else f'{(remaining / 60):.0f}'} "
-                    f"{'секунд' if remaining < 60 else 'минут(у)'} "
+                    f"{'секунд(у)' if remaining < 60 else 'минут(у)'} "
                     f"перед повторным включением сервера."
                 )
                 return
@@ -432,7 +437,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
-                active_chats.discard(update.effective_chat.id) # Сброс уведомлений при ошибке
+                active_chats.discard(update.effective_chat.id)  # Сброс уведомлений при ошибке
                 return
 
             watchdog_run()
@@ -459,7 +464,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: i
 
 
 @log_command("/poweroff")
-async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     """Обработчик команды /poweroff"""
     global last_poweroff_time, last_status_time  # Аналогично poweron
 
@@ -472,12 +477,12 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: 
     now = time.time()
     if now - last_poweroff_time < POWEROFF_COOLDOWN:
         remaining = int(POWEROFF_COOLDOWN - (now - last_poweroff_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} сек. перед повторным выключением.")
+        await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным выключением.")
         return
 
     if now - last_status_time < STATUS_COOLDOWN:
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом.")
+        await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
     try:
@@ -524,13 +529,13 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: 
 @check_maintenance
 @check_permissions
 @log_command("/status")
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     global last_status_time
 
     now = time.time()
     if now - last_status_time < STATUS_COOLDOWN:
         remaining = int(STATUS_COOLDOWN - (now - last_status_time))
-        await update.message.reply_text(f"⏳ Подождите {remaining} секунд перед повторным запросом статуса сервера.")
+        await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом статуса сервера.")
         return
 
     try:
@@ -564,7 +569,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ig
 
 
 @log_command("/maintain")
-async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     global MAINTENANCE_MODE
     if update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
@@ -578,9 +583,10 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE): # typ
     else:
         await update.message.reply_text("🎮 Режим обслуживания выключен.")
 
+
 @check_permissions
 @log_command("/mute")
-async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
 
     if update.effective_chat.type != 'private' and update.effective_user.id != ADMIN_CHAT_ID:
         await update.message.reply_text("⛔ В группах и каналах команда доступна только администратору.")
@@ -608,7 +614,7 @@ async def get_cached_mc_version(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 if __name__ == "__main__":
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build() # type: ignore
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()  # type: ignore
     if job_queue is None:
         job_queue = application.job_queue
     application.add_handler(CommandHandler("start", start))
