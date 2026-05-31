@@ -84,7 +84,7 @@ STATUS_COOLDOWN = 5  # запрос статуса
 watchdog_job: Optional[Job] = None
 job_queue: Optional[JobQueue] = None
 
-active_chats = set()
+active_chats = set() # Список чатов, в которые шлются уведомления
 
 
 def load_auth_data():
@@ -581,6 +581,10 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE): # typ
 @check_permissions
 @log_command("/mute")
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE): # type: ignore
+
+    if update.effective_chat.type != 'private' and update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("⛔ В группах и каналах команда доступна только администратору.")
+        return
 
     is_muted = context.chat_data.get("muted", False)
     context.chat_data["muted"] = not is_muted
