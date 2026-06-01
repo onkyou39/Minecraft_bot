@@ -70,7 +70,7 @@ async def get_mc_server_status(server_address: str = mc_server.server_address,
 @dataclass
 class WatchdogState:
     empty_since: float | None = None  # Когда сервер стал пустым
-    notified: bool = False  # Флаги для уведомлений
+    warning_3m_sent: bool = False  # Предупреждение за 3 минуты до отключения
     is_fresh_start: bool = True
     crashed: int = 0  # Сервер упал или ещё не запустился.
 
@@ -105,27 +105,24 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         elif now - watchdog_state.empty_since >= mc_server.wd_poweroff_cooldown:
             logger.warning("Watchdog: server remained empty, cooldown passed — shutting down VPS")
             if notify_callback:
-                await notify_callback(f"🔴 На сервере не было игроков больше "
-                                      f"{mc_server.wd_poweroff_cooldown // 60} минут."
-                                      f" Сервер выключен.")
+                await notify_callback(f"🔴 Сервер выключен после "
+                                      f"{mc_server.wd_poweroff_cooldown // 60} минут неактивности.")
             await shutdown_callback()
             watchdog_state.empty_since = None  # Reset after shutdown
-            watchdog_state.notified = False  # сбрасываем флаг после выключения
+            watchdog_state.warning_3m_sent = False  # сбрасываем флаг после выключения
             watchdog_state.is_fresh_start = True # следующий запуск будет новым
         else:
             remaining = int(mc_server.wd_poweroff_cooldown - (now - watchdog_state.empty_since))
             logger.info(f"Watchdog: server still empty, {remaining} seconds left until shutdown")
-            if notify_callback and not watchdog_state.notified:
-                await notify_callback(f"ℹ️ На сервере нет игроков. "
-                                      f"Сервер будет выключен через "
-                                      f"{mc_server.wd_poweroff_cooldown // 60} минут.")
-                watchdog_state.notified = True  # для однократного вывода
+            if remaining <= 180 and notify_callback and not watchdog_state.warning_3m_sent:
+                await notify_callback(f"ℹ️ На сервере никого нет. До выключения осталось 3 минуты.")
+                watchdog_state.warning_3m_sent = True  # для однократного вывода
 
     elif mc_server.players_online is not None:
         if watchdog_state.empty_since is not None:
             logger.info("Watchdog: players joined — resetting shutdown timer")
             watchdog_state.empty_since = None  # Reset timer because players are online
-            watchdog_state.notified = False
+            watchdog_state.warning_3m_sent = False
     else: # случай с падением minecraft или первым запуском.
         if not watchdog_state.is_fresh_start:
             logger.warning("Watchdog: looks like minecraft server is crashed or unreachable.")
@@ -133,7 +130,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             logger.info("Watchdog: Minecraft server is offline and probably starting.")
         if notify_callback and watchdog_state.crashed > 1 and not watchdog_state.is_fresh_start:
             await notify_callback("⚠️ Minecraft сервер временно недоступен или аварийно завершил работу.")
-            watchdog_state.notified = False
+            watchdog_state.warning_3m_sent = False
             watchdog_state.is_fresh_start = True # для вывода уведомления о запуске
         elif notify_callback and watchdog_state.crashed == 0 and watchdog_state.is_fresh_start:
             await notify_callback("⏳ Minecraft сервер запускается...")
