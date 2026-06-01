@@ -42,7 +42,7 @@ async def test_empty_server_timer_not_expired(monkeypatch):
     watchdog_state.reset()
     watchdog_state.empty_since = time.time() - 100
     watchdog_state.is_fresh_start = False
-    watchdog_state.notified = False
+    watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
     assert "нет игроков" in state["notified"]
@@ -65,7 +65,7 @@ async def test_empty_server_shutdown(monkeypatch):
     watchdog_state.reset()
     watchdog_state.empty_since = time.time() - mc_server.wd_poweroff_cooldown - 5
     watchdog_state.is_fresh_start = False
-    watchdog_state.notified = False
+    watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
     assert "выключен" in state["notified"]
@@ -90,7 +90,7 @@ async def test_server_crashed(monkeypatch):
     watchdog_state.reset()
     watchdog_state.crashed = crashes["count"]
     watchdog_state.is_fresh_start = False
-    watchdog_state.notified = False
+    watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
     assert "временно недоступен" in state["notified"]
@@ -114,7 +114,7 @@ async def test_first_start(monkeypatch):
     watchdog_state.reset()
     watchdog_state.crashed = 0
     watchdog_state.is_fresh_start = True
-    watchdog_state.notified = False
+    watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
     assert "запускается" in state["notified"]
@@ -144,7 +144,7 @@ async def test_failed_server_status(monkeypatch):
     watchdog_state.reset()
     watchdog_state.crashed = crashes["count"]
     watchdog_state.is_fresh_start = False
-    watchdog_state.notified = False
+    watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
     assert state["notified"] is None
