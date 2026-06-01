@@ -40,12 +40,12 @@ async def test_empty_server_timer_not_expired(monkeypatch):
 
     # Подготавливаем состояние датакласса
     watchdog_state.reset()
-    watchdog_state.empty_since = time.time() - 100
+    watchdog_state.empty_since = time.time() - mc_server.wd_poweroff_cooldown + 120
     watchdog_state.is_fresh_start = False
     watchdog_state.warning_3m_sent = False
 
     await watchdog_tick(shutdown_cb, notify_cb)
-    assert "нет игроков" in state["notified"]
+    assert "никого нет" in state["notified"]
     assert not state["shutdown"]
 
 
