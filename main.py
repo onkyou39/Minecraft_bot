@@ -188,6 +188,9 @@ async def api_request(action: str):
 
 def watchdog_stop():
     global watchdog_job
+
+    mc_server.shutdown_remaining = None # Сброс runtime состояния minecraft сервера
+
     if watchdog_job is not None:
         watchdog_job.schedule_removal()
         watchdog_job = None
@@ -553,8 +556,22 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
         if is_power_on and not context.chat_data.get("muted", False):
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
             if mc_server.online:
-                await update.message.reply_text(f"🟢 Сервер включен. На сервере {mc_server.players_online} игрок(ов).")
                 watchdog_run()
+                message = (
+                    f"🟢 Сервер включен. "
+                    f"На сервере {mc_server.players_online} игрок(ов)."
+                )
+
+                if mc_server.players_online == 0:
+                    remaining = (
+                        f"{mc_server.shutdown_remaining} сек."
+                        if mc_server.shutdown_remaining < 60
+                        else f"{(mc_server.shutdown_remaining / 60):.0f} мин."
+                    )
+
+                    message += f"\n⏳ До автовыключения: {remaining}"
+
+                await update.message.reply_text(message)
             else:
                 await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
                 mc_server.online = False
