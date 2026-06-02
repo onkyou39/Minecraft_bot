@@ -23,7 +23,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 notify_logger = logging.getLogger("notify")
-logging.getLogger("notify").setLevel(logging.DEBUG)
+logging.getLogger("notify").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
