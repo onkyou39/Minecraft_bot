@@ -112,9 +112,9 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             watchdog_state.warning_3m_sent = False  # сбрасываем флаг после выключения
             watchdog_state.is_fresh_start = True # следующий запуск будет новым
         else:
-            remaining = int(mc_server.wd_poweroff_cooldown - (now - watchdog_state.empty_since))
-            logger.info(f"Watchdog: server still empty, {remaining} seconds left until shutdown")
-            if remaining <= 180 and notify_callback and not watchdog_state.warning_3m_sent:
+            mc_server.shutdown_remaining = int(mc_server.wd_poweroff_cooldown - (now - watchdog_state.empty_since))
+            logger.info(f"Watchdog: server still empty, {mc_server.shutdown_remaining} seconds left until shutdown")
+            if mc_server.shutdown_remaining <= 180 and notify_callback and not watchdog_state.warning_3m_sent:
                 await notify_callback(f"ℹ️ На сервере никого нет. До выключения осталось 3 минуты.")
                 watchdog_state.warning_3m_sent = True  # для однократного вывода
 

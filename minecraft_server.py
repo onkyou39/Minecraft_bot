@@ -13,5 +13,6 @@ class MinecraftServer:
     online: bool = False
     players_online: int | None  = None
     last_check: float | None = None # Пока не используется
+    shutdown_remaining: int | None = None # Осталось до перезапуска
 
 mc_server = MinecraftServer() # Общий shared instance Minecraft сервера
