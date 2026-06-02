@@ -555,8 +555,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on and not context.chat_data.get("muted", False):
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
+            watchdog_run()
             if mc_server.online:
-                watchdog_run()
                 message = (
                     f"🟢 Сервер включен. "
                     f"На сервере {mc_server.players_online} игрок(ов)."
