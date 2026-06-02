@@ -562,7 +562,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
                     f"На сервере {mc_server.players_online} игрок(ов)."
                 )
 
-                if mc_server.players_online == 0:
+                if mc_server.players_online == 0 and mc_server.shutdown_remaining is not None:
                     remaining = (
                         f"{mc_server.shutdown_remaining} сек."
                         if mc_server.shutdown_remaining < 60

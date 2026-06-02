@@ -111,6 +111,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             watchdog_state.empty_since = None  # Reset after shutdown
             watchdog_state.warning_3m_sent = False  # сбрасываем флаг после выключения
             watchdog_state.is_fresh_start = True # следующий запуск будет новым
+            mc_server.shutdown_remaining = None
         else:
             mc_server.shutdown_remaining = int(mc_server.wd_poweroff_cooldown - (now - watchdog_state.empty_since))
             logger.info(f"Watchdog: server still empty, {mc_server.shutdown_remaining} seconds left until shutdown")
@@ -122,6 +123,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         if watchdog_state.empty_since is not None:
             logger.info("Watchdog: players joined — resetting shutdown timer")
             watchdog_state.empty_since = None  # Reset timer because players are online
+            mc_server.shutdown_remaining = None
             watchdog_state.warning_3m_sent = False
     else: # случай с падением minecraft или первым запуском.
         if not watchdog_state.is_fresh_start:
@@ -132,6 +134,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             await notify_callback("⚠️ Minecraft сервер временно недоступен или аварийно завершил работу.")
             watchdog_state.warning_3m_sent = False
             watchdog_state.is_fresh_start = True # для вывода уведомления о запуске
+            mc_server.shutdown_remaining = None
         elif notify_callback and watchdog_state.crashed == 0 and watchdog_state.is_fresh_start:
             await notify_callback("⏳ Minecraft сервер запускается...")
         watchdog_state.crashed += 1
