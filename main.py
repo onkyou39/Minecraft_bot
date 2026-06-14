@@ -199,15 +199,21 @@ def watchdog_stop():
 
 
 async def shutdown_vps():
-    global last_poweron_time, watchdog_job
+    global last_poweron_time
     now = time.time()
-    mc_server.online = False  # Minecraft сервер неактивен при полном выключении VPS
-    active_chats.clear()  # сброс активных чатов для уведомлений после выключения сервера
+    result = await api_request("ShutDownGuestOS")
+    logger.debug(f"shutdown_vps_API_result = {result}")
+    if "error" in result:
+        return result  # ничего не трогаем
+    # считаем, что shutdown инициирован успешно
     last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
     # после выключения VPS сбрасываем задачу и состояние watchdog
     watchdog_stop()
     reset_watchdog_state()
-    return await api_request("ShutDownGuestOS")
+    mc_server.reset_runtime()  # сброс runtime состояния MC сервера
+    active_chats.clear()  # сброс активных чатов для уведомлений после выключения сервера
+    logger.info("Shutdown VPS initiated successfully")
+    return result
 
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue

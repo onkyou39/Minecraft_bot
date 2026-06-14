@@ -15,4 +15,10 @@ class MinecraftServer:
     last_check: float | None = None # Пока не используется
     shutdown_remaining: int | None = None # Осталось до перезапуска
 
+    def reset_runtime(self):
+        self.online = False
+        self.players_online = None
+        self.shutdown_remaining = None
+        self.last_check = None
+
 mc_server = MinecraftServer() # Общий shared instance Minecraft сервера
