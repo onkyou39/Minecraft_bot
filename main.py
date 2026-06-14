@@ -26,6 +26,7 @@ notify_logger = logging.getLogger("notify")
 logging.getLogger("notify").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def log_command(command_name):
@@ -553,6 +554,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
             return
         last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
+        logger.debug(
+            f"IsPowerOn={is_power_on}, type={type(is_power_on)}"
+        )
+        logger.debug(f"server_status={server_status}")
         if is_power_on and not context.chat_data.get("muted", False):
             active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
             watchdog_run()
