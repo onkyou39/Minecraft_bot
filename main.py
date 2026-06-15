@@ -313,8 +313,8 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         await update.message.reply_text("⚠️ Неправильно введённая команда.")
         return
 
-    if now - vps_service.last_status_time < STATUS_COOLDOWN and not context.args:
-        remaining = int(STATUS_COOLDOWN - (now - vps_service.last_status_time))
+    if now - vps_service.vps_state.last_status_time < STATUS_COOLDOWN and not context.args:
+        remaining = int(STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
@@ -322,7 +322,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         # Запрос текущего статуса VPS
         server_status = await api.get_vps_server_status()
         # Запрос текущего статуса Minecraft
-        await watchdog.get_mc_server_status()
+        await watchdog.refresh_mc_server_state()
 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
@@ -332,11 +332,11 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
             watchdog.watchdog_run()
-            vps_service.last_status_time = now
+            vps_service.vps_state.last_status_time = now
             return
         elif is_power_on is False:
-            if now - vps_service.last_poweron_time < POWERON_COOLDOWN and not context.args:
-                remaining = int(POWERON_COOLDOWN - (now - vps_service.last_poweron_time))
+            if now - vps_service.vps_state.last_poweron_time < POWERON_COOLDOWN and not context.args:
+                remaining = int(POWERON_COOLDOWN - (now - vps_service.vps_state.last_poweron_time))
                 await update.message.reply_text(
                     f"⏳ Подождите {remaining if remaining < 60 else f'{(remaining / 60):.0f}'} "
                     f"{'секунд(у)' if remaining < 60 else 'минут(у)'} "
@@ -359,8 +359,8 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
-            vps_service.last_poweron_time = now
-            vps_service.last_status_time = now
+            vps_service.vps_state.last_poweron_time = now
+            vps_service.vps_state.last_status_time = now
 
             chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
             if chat_type == 'private':
@@ -385,13 +385,13 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
     # Проверка кулдауна
     now = time.time()
-    if now - vps_service.last_poweroff_time < POWEROFF_COOLDOWN:
-        remaining = int(POWEROFF_COOLDOWN - (now - vps_service.last_poweroff_time))
+    if now - vps_service.vps_state.last_poweroff_time < POWEROFF_COOLDOWN:
+        remaining = int(POWEROFF_COOLDOWN - (now - vps_service.vps_state.last_poweroff_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным выключением.")
         return
 
-    if now - vps_service.last_status_time < STATUS_COOLDOWN:
-        remaining = int(STATUS_COOLDOWN - (now - vps_service.last_status_time))
+    if now - vps_service.vps_state.last_status_time < STATUS_COOLDOWN:
+        remaining = int(STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
@@ -406,7 +406,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
         if is_power_on is False:
             await update.message.reply_text("✅ Сервер уже выключен.")
-            vps_service.last_status_time = now
+            vps_service.vps_state.last_status_time = now
             return
 
         elif is_power_on:
@@ -422,8 +422,8 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
             else:
                 await update.message.reply_text(f"✅ Запрос отправлен. Статус: {state}")
 
-            vps_service.last_poweroff_time = now
-            vps_service.last_status_time = now
+            vps_service.vps_state.last_poweroff_time = now
+            vps_service.vps_state.last_status_time = now
 
             #await notify_admin(update, context, "отправил запрос на выключение сервера")
 
@@ -441,8 +441,8 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
 
     now = time.time()
-    if now - vps_service.last_status_time < STATUS_COOLDOWN:
-        remaining = int(STATUS_COOLDOWN - (now - vps_service.last_status_time))
+    if now - vps_service.vps_state.last_status_time < STATUS_COOLDOWN:
+        remaining = int(STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом статуса сервера.")
         return
 
@@ -454,7 +454,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-        vps_service.last_status_time = now  # обновляем время успешного запроса статуса
+        vps_service.vps_state.last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
         logger.debug(f"server_status={server_status}")
         logger.debug(
