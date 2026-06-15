@@ -3,7 +3,7 @@ import os
 from dataclasses import dataclass, field
 
 @dataclass
-class TgBot:
+class BotState:
     # константы
     authorized_file: str = "authorized.json"
     telegram_token: str = os.getenv("TELEGRAM_TOKEN")
@@ -13,4 +13,4 @@ class TgBot:
     active_chats: set[int] = field(default_factory=set)  # Список чатов, в которые шлются уведомления
 
 
-tg_bot = TgBot() # Общий shared instance состояния телеграм бота
+bot_state = BotState() # Общий shared instance состояния телеграм бота

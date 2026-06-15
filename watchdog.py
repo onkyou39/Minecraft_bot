@@ -9,7 +9,7 @@ from dataclasses import dataclass, fields
 from telegram.ext import Job, JobQueue
 import vps_service
 from minecraft_server import mc_server
-from telegram_bot import tg_bot
+from bot_state import bot_state
 
 load_dotenv()
 logging.basicConfig(
@@ -98,7 +98,7 @@ def watchdog_stop():
 async def watchdog_notifyer(message: str):
     try:
         #for chat_id in list(authorized_groups.union(authorized_users.keys())):
-        for chat_id in tg_bot.active_chats:
+        for chat_id in bot_state.active_chats:
             if chat_id:
                 await application.bot.send_message(chat_id=chat_id, text=message)  # type: ignore
         logger.debug(f"Watchdog sent notification: {message}")
@@ -109,7 +109,7 @@ async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Ð
     await watchdog_tick(vps_service.shutdown_vps, watchdog_notifyer)
 
 def watchdog_run():
-    if watchdog_state.watchdog_job is None and not tg_bot.maintenance_mode:
+    if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
         watchdog_state.watchdog_job = watchdog_state.job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
                                                job_kwargs={'misfire_grace_time': 2})
         logger.info("Started watchdog job")

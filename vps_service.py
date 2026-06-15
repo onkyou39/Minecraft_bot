@@ -4,7 +4,7 @@ import time
 import api
 import watchdog
 from minecraft_server import mc_server
-from telegram_bot import tg_bot
+from bot_state import bot_state
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,6 @@ async def shutdown_vps():
     watchdog.watchdog_stop()
     watchdog.reset_watchdog_state()
     mc_server.reset_runtime()  # сброс runtime состояния MC сервера
-    tg_bot.active_chats.clear()  # сброс активных чатов для уведомлений после выключения сервера
+    bot_state.active_chats.clear()  # сброс активных чатов для уведомлений после выключения сервера
     logger.info("Shutdown VPS initiated successfully")
     return result
