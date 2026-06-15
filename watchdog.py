@@ -1,11 +1,15 @@
 import asyncio
 import logging
 import time
+from typing import Optional
 from dotenv import load_dotenv
 from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
+from telegram.ext import Job, JobQueue
+import vps_service
 from minecraft_server import mc_server
+from telegram_bot import tg_bot
 
 load_dotenv()
 logging.basicConfig(
@@ -15,7 +19,7 @@ logging.basicConfig(
 
 
 logger = logging.getLogger("watchdog")
-logger.setLevel(logging.INFO)
+#logger.setLevel(logging.INFO)
 
 
 
@@ -73,12 +77,42 @@ class WatchdogState:
     warning_3m_sent: bool = False  # Предупреждение за 3 минуты до отключения
     is_fresh_start: bool = True
     crashed: int = 0  # Сервер упал или ещё не запустился.
+    watchdog_job: Optional[Job] = None
+    job_queue: Optional[JobQueue] = None
 
     def reset(self):
         for f in fields(self):
             setattr(self, f.name, f.default)
 
 watchdog_state = WatchdogState()
+
+def watchdog_stop():
+
+    mc_server.shutdown_remaining = None # Сброс runtime состояния minecraft сервера
+
+    if watchdog_state.watchdog_job is not None:
+        watchdog_state.watchdog_job.schedule_removal()
+        watchdog_state.watchdog_job = None
+        logger.info("Removed watchdog job")
+
+async def watchdog_notifyer(message: str):
+    try:
+        #for chat_id in list(authorized_groups.union(authorized_users.keys())):
+        for chat_id in tg_bot.active_chats:
+            if chat_id:
+                await application.bot.send_message(chat_id=chat_id, text=message)  # type: ignore
+        logger.debug(f"Watchdog sent notification: {message}")
+    except Exception as e:
+        logger.debug(f"Watchdog notification failed: {str(e)}")
+
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue
+    await watchdog_tick(vps_service.shutdown_vps, watchdog_notifyer)
+
+def watchdog_run():
+    if watchdog_state.watchdog_job is None and not tg_bot.MAINTENANCE_MODE:
+        watchdog_state.watchdog_job = watchdog_state.job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
+                                               job_kwargs={'misfire_grace_time': 2})
+        logger.info("Started watchdog job")
 
 
 def reset_watchdog_state():
