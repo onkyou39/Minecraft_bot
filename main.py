@@ -26,7 +26,7 @@ notify_logger = logging.getLogger("notify")
 logging.getLogger("notify").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def log_command(command_name):
