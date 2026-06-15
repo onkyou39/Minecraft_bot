@@ -588,7 +588,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
 
                 await update.message.reply_text(message)
             else:
-                await update.message.reply_text("🟡 Linux cервер включен. Minecraft сервер не запущен.")
+                await update.message.reply_text("🟡 Minecraft сервер запускается или ещё недоступен.")
                 mc_server.online = False
         elif is_power_on is False:
             await update.message.reply_text("🔴 Сервер выключен.")
