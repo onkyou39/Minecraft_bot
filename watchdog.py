@@ -109,7 +109,7 @@ async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Ð
     await watchdog_tick(vps_service.shutdown_vps, watchdog_notifyer)
 
 def watchdog_run():
-    if watchdog_state.watchdog_job is None and not tg_bot.MAINTENANCE_MODE:
+    if watchdog_state.watchdog_job is None and not tg_bot.maintenance_mode:
         watchdog_state.watchdog_job = watchdog_state.job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
                                                job_kwargs={'misfire_grace_time': 2})
         logger.info("Started watchdog job")

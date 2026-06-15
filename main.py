@@ -48,7 +48,7 @@ load_dotenv()
 def check_maintenance(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
-        if tg_bot.MAINTENANCE_MODE:
+        if tg_bot.maintenance_mode:
             await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте выполнить запрос позже.")
             return None
         return await func(update, context)
@@ -79,7 +79,7 @@ STATUS_COOLDOWN = 5  # запрос статуса
 
 def load_auth_data():
     try:
-        with open(tg_bot.AUTHORIZED_FILE, "r") as f:
+        with open(tg_bot.authorized_file, "r") as f:
             data = json.load(f)
             # Преобразуем список пользователей в словарь с int ключами
             users = {int(user["id"]): user.get("username", "")
@@ -96,7 +96,7 @@ def save_auth_data():
                   for uid, name in authorized_users.items()],
         "groups": list(authorized_groups)
     }
-    with open(tg_bot.AUTHORIZED_FILE, "w") as f:
+    with open(tg_bot.authorized_file, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -107,7 +107,7 @@ def is_authorized(chat_id: int) -> bool:
     return (
             chat_id in authorized_users
             or chat_id in authorized_groups
-            or chat_id == tg_bot.ADMIN_CHAT_ID
+            or chat_id == tg_bot.admin_chat_id
     )
 
 
@@ -118,7 +118,7 @@ def get_user_name(update: Update) -> str:
 async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):  # type: ignore
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
-    await context.bot.send_message(chat_id=tg_bot.ADMIN_CHAT_ID, text=message)
+    await context.bot.send_message(chat_id=tg_bot.admin_chat_id, text=message)
 
 
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
@@ -136,7 +136,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ig
     chat_id = update.effective_chat.id
     user_name = get_user_name(update)
 
-    await context.bot.send_message(chat_id=tg_bot.ADMIN_CHAT_ID,
+    await context.bot.send_message(chat_id=tg_bot.admin_chat_id,
                                    text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
     await update.message.reply_text("👋 Бот запущен.")
 
@@ -172,7 +172,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может добавить группу.")
         return
 
@@ -187,7 +187,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
 @log_command("/adduser")
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
 
@@ -222,7 +222,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может удалить группу.")
         return
 
@@ -237,7 +237,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 @log_command("/removeuser")
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
         return
 
@@ -270,7 +270,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # typ
 @log_command("/authorized")
 async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
         return
 
@@ -306,7 +306,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
     now = time.time()
 
     if len(context.args) == 1 and context.args[0] == "force":  # type: ignore
-        if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+        if update.effective_user.id != tg_bot.admin_chat_id:
             await update.message.reply_text("⛔ Недостаточно прав для принудительного включения.")
             return
     elif context.args:
@@ -379,7 +379,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
     """Обработчик команды /poweroff"""
 
     # Проверка прав
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
@@ -500,13 +500,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
 
 @log_command("/maintain")
 async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
-    if update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
-    tg_bot.MAINTENANCE_MODE = not tg_bot.MAINTENANCE_MODE
+    tg_bot.maintenance_mode = not tg_bot.maintenance_mode
 
-    if tg_bot.MAINTENANCE_MODE:
+    if tg_bot.maintenance_mode:
         watchdog.watchdog_stop()
         await update.message.reply_text("🚧 Режим обслуживания включен.")
     else:
@@ -517,7 +517,7 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 @log_command("/mute")
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
 
-    if update.effective_chat.type != 'private' and update.effective_user.id != tg_bot.ADMIN_CHAT_ID:
+    if update.effective_chat.type != 'private' and update.effective_user.id != tg_bot.admin_chat_id:
         await update.message.reply_text("⛔ В группах и каналах команда доступна только администратору.")
         return
 

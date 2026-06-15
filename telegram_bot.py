@@ -1,16 +1,16 @@
 """Датакласс для хранения состояния Telegram бота"""
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class TgBot:
     # константы
-    AUTHORIZED_FILE = "authorized.json"
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))  # type: ignore
+    authorized_file: str = "authorized.json"
+    telegram_token: str = os.getenv("TELEGRAM_TOKEN")
+    admin_chat_id: int = int(os.getenv("ADMIN_CHAT_ID"))  # type: ignore
     #runtime
-    MAINTENANCE_MODE = False
-    active_chats = set()  # Список чатов, в которые шлются уведомления
+    maintenance_mode: bool = False
+    active_chats: set[int] = field(default_factory=set)  # Список чатов, в которые шлются уведомления
 
 
 tg_bot = TgBot() # Общий shared instance состояния телеграм бота
