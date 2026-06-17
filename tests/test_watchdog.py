@@ -1,6 +1,10 @@
 import pytest
 import time
+
+from services import watchdog
 from services.watchdog import watchdog_tick, mc_server, watchdog_state
+
+
 
 @pytest.mark.asyncio
 async def test_online_with_players(monkeypatch):
@@ -14,7 +18,7 @@ async def test_online_with_players(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.get_mc_server_status", mock_get_mc_server_status)
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_get_mc_server_status)
 
     # Сбрасываем состояние датакласса перед тестом
     watchdog_state.reset()
@@ -36,7 +40,7 @@ async def test_empty_server_timer_not_expired(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.get_mc_server_status", mock_get_mc_server_status)
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_get_mc_server_status)
 
     # Подготавливаем состояние датакласса
     watchdog_state.reset()
@@ -60,7 +64,7 @@ async def test_empty_server_shutdown(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.get_mc_server_status", mock_get_mc_server_status)
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_get_mc_server_status)
 
     watchdog_state.reset()
     watchdog_state.empty_since = time.time() - mc_server.wd_poweroff_cooldown - 5
@@ -85,7 +89,7 @@ async def test_server_crashed(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.get_mc_server_status", mock_get_mc_server_status)
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_get_mc_server_status)
 
     watchdog_state.reset()
     watchdog_state.crashed = crashes["count"]
@@ -101,7 +105,7 @@ async def test_first_start(monkeypatch):
     state = {"notified": None, "shutdown": False}
 
     # сервер недоступен, первый запуск
-    async def mock_get_mc_server_status():
+    async def mock_refresh_mc_server_status():
         mc_server.online = False
         mc_server.players_online = None
 
@@ -109,7 +113,7 @@ async def test_first_start(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.get_mc_server_status", mock_get_mc_server_status)
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_status)
 
     watchdog_state.reset()
     watchdog_state.crashed = 0
@@ -138,8 +142,8 @@ async def test_failed_server_status(monkeypatch):
     async def notify_cb(msg): state["notified"] = msg
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr("watchdog.fast_check", mock_fast_check)
-    monkeypatch.setattr("watchdog.JavaServer.async_lookup", mock_lookup)
+    monkeypatch.setattr(watchdog,"fast_check", mock_fast_check)
+    monkeypatch.setattr(watchdog.JavaServer,"async_lookup", mock_lookup)
 
     watchdog_state.reset()
     watchdog_state.crashed = crashes["count"]
