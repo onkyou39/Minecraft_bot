@@ -258,7 +258,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-        bot_config.active_chats.add(update.effective_chat.id)  # Вывод уведомлений о статусе сервера в текущий чат
+        bot_state.active_chats.add(update.effective_chat.id)  # Вывод уведомлений о статусе сервера в текущий чат
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
