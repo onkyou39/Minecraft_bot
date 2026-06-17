@@ -1,5 +1,4 @@
 """Датакласс для хранения состояния Telegram бота"""
-import os
 from dataclasses import dataclass, field
 
 @dataclass
