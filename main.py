@@ -17,7 +17,6 @@ logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-load_dotenv()
 
 if __name__ == "__main__":
     application = ApplicationBuilder().token(bot_config.telegram_token).build()

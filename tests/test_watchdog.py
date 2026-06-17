@@ -1,7 +1,8 @@
 import pytest
 import time
-
 from services import watchdog
+
+# для будущих тестов
 @pytest.fixture
 def clean_watchdog():
     watchdog.watchdog_state.reset()
