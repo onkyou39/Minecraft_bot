@@ -12,6 +12,7 @@
 **/.env
 **/.env.example
 **/.git
+**/.github
 **/.gitignore
 **/.project
 **/.settings
