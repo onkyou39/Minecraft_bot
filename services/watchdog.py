@@ -95,6 +95,18 @@ def watchdog_stop():
         watchdog_state.watchdog_job = None
         logger.info("Removed watchdog job")
 
+async def watchdog_shutdown():
+    result = await vps_service.shutdown_vps()
+    if "error" in result:
+        logger.error(f"Failed to shutdown VPS: {result['error']}")
+        return result
+    watchdog_stop()
+    reset_watchdog_state()
+    mc_server.reset_runtime()
+    bot_state.active_chats.clear()
+    logger.info("Watchdog shutdown initiated successfully")
+    return result
+
 async def watchdog_notifyer(message: str):
     try:
         #for chat_id in list(authorized_groups.union(authorized_users.keys())):
@@ -106,7 +118,7 @@ async def watchdog_notifyer(message: str):
         logger.debug(f"Watchdog notification failed: {str(e)}")
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue
-    await watchdog_tick(vps_service.shutdown_vps, watchdog_notifyer)
+    await watchdog_tick(watchdog_shutdown, watchdog_notifyer)
 
 def watchdog_run():
     if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:

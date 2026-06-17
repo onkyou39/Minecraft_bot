@@ -22,7 +22,7 @@ load_dotenv()
 if __name__ == "__main__":
     application = ApplicationBuilder().token(bot_state.telegram_token).build()
     if watchdog_state.job_queue is None:
-        job_queue = application.job_queue
+        watchdog_state.job_queue = application.job_queue
     register_handlers(application)
     application.run_polling(poll_interval=1, timeout=30)
     #application.run_polling()
