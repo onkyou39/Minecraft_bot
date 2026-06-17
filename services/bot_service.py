@@ -1,4 +1,4 @@
-from state.bot_state import bot_state
+from config.config import bot_config
 import json
 import logging
 from telegram import Update
@@ -18,7 +18,7 @@ def log_command(command_name):
 
 def load_auth_data():
     try:
-        with open(bot_state.authorized_file, "r") as f:
+        with open(bot_config.authorized_file, "r") as f:
             data = json.load(f)
             # Преобразуем список пользователей в словарь с int ключами
             users = {int(user["id"]): user.get("username", "")
@@ -35,7 +35,7 @@ def save_auth_data():
                   for uid, name in authorized_users.items()],
         "groups": list(authorized_groups)
     }
-    with open(bot_state.authorized_file, "w") as f:
+    with open(bot_config.authorized_file, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -46,7 +46,7 @@ def is_authorized(chat_id: int) -> bool:
     return (
             chat_id in authorized_users
             or chat_id in authorized_groups
-            or chat_id == bot_state.admin_chat_id
+            or chat_id == bot_config.admin_chat_id
     )
 
 
@@ -57,7 +57,7 @@ def get_user_name(update: Update) -> str:
 async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):  # type: ignore
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
-    await context.bot.send_message(chat_id=bot_state.admin_chat_id, text=message)
+    await context.bot.send_message(chat_id=bot_config.admin_chat_id, text=message)
 
 
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
