@@ -1,10 +1,10 @@
 """Функции управления VPS сервером"""
 import logging
 import time
-import api
+from integrations import api
 import watchdog
-from minecraft_server import mc_server
-from bot_state import bot_state
+from state.minecraft_server import mc_server
+from state.bot_state import bot_state
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

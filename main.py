@@ -1,9 +1,9 @@
 import logging
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder
-from bot_state import bot_state
-from watchdog import watchdog_state
-from handlers import register_handlers
+from state.bot_state import bot_state
+from services.watchdog import watchdog_state
+from telegram.handlers import register_handlers
 
 # Enable logging
 

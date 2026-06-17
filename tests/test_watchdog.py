@@ -1,6 +1,6 @@
 import pytest
 import time
-from watchdog import watchdog_tick, mc_server, watchdog_state
+from services.watchdog import watchdog_tick, mc_server, watchdog_state
 
 @pytest.mark.asyncio
 async def test_online_with_players(monkeypatch):

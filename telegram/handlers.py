@@ -1,16 +1,15 @@
 import logging
 import time
 from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes
-import api
-import bot_service
-import vps_service
-import watchdog
-from bot_service import log_command
-from bot_state import bot_state
+from integrations import api
+from services import vps_service, watchdog, bot_service
+from services.bot_service import log_command
+from state.bot_state import bot_state
+from config.config import bot_config
 from functools import wraps
 from telegram import Update
 import random
-from minecraft_server import mc_server
+from state.minecraft_server import mc_server
 
 
 # Кэшированный статус Minecraft-сервера
@@ -68,7 +67,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ig
     chat_id = update.effective_chat.id
     user_name = bot_service.get_user_name(update)
 
-    await context.bot.send_message(chat_id=bot_state.admin_chat_id,
+    await context.bot.send_message(chat_id=bot_config.admin_chat_id,
                                    text=f"Новый пользователь @{user_name} с chat_id {chat_id} запустил бота.")
     await update.message.reply_text("👋 Бот запущен.")
 
@@ -104,7 +103,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может добавить группу.")
         return
 
@@ -119,7 +118,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
 @log_command("/adduser")
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
 
@@ -154,7 +153,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может удалить группу.")
         return
 
@@ -169,7 +168,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 @log_command("/removeuser")
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
         return
 
@@ -202,7 +201,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # typ
 @log_command("/authorized")
 async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
     # Проверка прав администратора
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
         return
 
@@ -238,15 +237,15 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
     now = time.time()
 
     if len(context.args) == 1 and context.args[0] == "force":  # type: ignore
-        if update.effective_user.id != bot_state.admin_chat_id:
+        if update.effective_user.id != bot_config.admin_chat_id:
             await update.message.reply_text("⛔ Недостаточно прав для принудительного включения.")
             return
     elif context.args:
         await update.message.reply_text("⚠️ Неправильно введённая команда.")
         return
 
-    if now - vps_service.vps_state.last_status_time < bot_state.STATUS_COOLDOWN and not context.args:
-        remaining = int(bot_state.STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
+    if now - vps_service.vps_state.last_status_time < bot_config.status_cooldown and not context.args:
+        remaining = int(bot_config.status_cooldown - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
@@ -259,7 +258,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
         if "error" in server_status:
             await update.message.reply_text(f"⚠️ Ошибка при запросе статуса: {server_status['error']}")
             return
-        bot_state.active_chats.add(update.effective_chat.id)  # Вывод уведомлений о статусе сервера в текущий чат
+        bot_config.active_chats.add(update.effective_chat.id)  # Вывод уведомлений о статусе сервера в текущий чат
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
@@ -267,8 +266,8 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
             vps_service.vps_state.last_status_time = now
             return
         elif is_power_on is False:
-            if now - vps_service.vps_state.last_poweron_time < bot_state.POWERON_COOLDOWN and not context.args:
-                remaining = int(bot_state.POWERON_COOLDOWN - (now - vps_service.vps_state.last_poweron_time))
+            if now - vps_service.vps_state.last_poweron_time < bot_config.poweron_cooldown and not context.args:
+                remaining = int(bot_config.poweron_cooldown - (now - vps_service.vps_state.last_poweron_time))
                 await update.message.reply_text(
                     f"⏳ Подождите {remaining if remaining < 60 else f'{(remaining / 60):.0f}'} "
                     f"{'секунд(у)' if remaining < 60 else 'минут(у)'} "
@@ -311,19 +310,19 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
     """Обработчик команды /poweroff"""
 
     # Проверка прав
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
     # Проверка кулдауна
     now = time.time()
-    if now - vps_service.vps_state.last_poweroff_time < bot_state.POWEROFF_COOLDOWN:
-        remaining = int(bot_state.POWEROFF_COOLDOWN - (now - vps_service.vps_state.last_poweroff_time))
+    if now - vps_service.vps_state.last_poweroff_time < bot_config.poweroff_cooldown:
+        remaining = int(bot_config.poweroff_cooldown - (now - vps_service.vps_state.last_poweroff_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным выключением.")
         return
 
-    if now - vps_service.vps_state.last_status_time < bot_state.STATUS_COOLDOWN:
-        remaining = int(bot_state.STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
+    if now - vps_service.vps_state.last_status_time < bot_config.status_cooldown:
+        remaining = int(bot_config.status_cooldown - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом.")
         return
 
@@ -373,8 +372,8 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
 
     now = time.time()
-    if now - vps_service.vps_state.last_status_time < bot_state.STATUS_COOLDOWN:
-        remaining = int(bot_state.STATUS_COOLDOWN - (now - vps_service.vps_state.last_status_time))
+    if now - vps_service.vps_state.last_status_time < bot_config.status_cooldown:
+        remaining = int(bot_config.status_cooldown - (now - vps_service.vps_state.last_status_time))
         await update.message.reply_text(f"⏳ Подождите {remaining} секунд(у) перед повторным запросом статуса сервера.")
         return
 
@@ -432,7 +431,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
 
 @log_command("/maintain")
 async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
-    if update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
 
@@ -449,7 +448,7 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 @log_command("/mute")
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
 
-    if update.effective_chat.type != 'private' and update.effective_user.id != bot_state.admin_chat_id:
+    if update.effective_chat.type != 'private' and update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ В группах и каналах команда доступна только администратору.")
         return
 

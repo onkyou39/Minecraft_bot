@@ -7,9 +7,9 @@ from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
 from telegram.ext import Job, JobQueue
-import vps_service
-from minecraft_server import mc_server
-from bot_state import bot_state
+from services import vps_service
+from state.minecraft_server import mc_server
+from state.bot_state import bot_state
 
 load_dotenv()
 logging.basicConfig(

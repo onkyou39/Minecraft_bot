@@ -1,4 +1,4 @@
-from bot_state import bot_state
+from state.bot_state import bot_state
 import json
 import logging
 from telegram import Update
