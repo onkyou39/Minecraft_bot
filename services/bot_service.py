@@ -1,3 +1,4 @@
+from telegram.ext import ContextTypes
 from config.config import bot_config
 import json
 import logging
@@ -7,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def log_command(command_name):
     def decorator(func):
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):  # type: ignore
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
             logger.info(f"{get_user_name(update)} sent COMMAND {command_name}")
             return await func(update, context, *args, **kwargs)
 
@@ -53,13 +54,13 @@ def get_user_name(update: Update) -> str:
     return update.effective_user.username or update.effective_user.full_name or "Неизвестный пользователь"
 
 
-async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):  # type: ignore
+async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
     user_name = get_user_name(update)
     message = f"Пользователь @{user_name} {action}."
     await context.bot.send_message(chat_id=bot_config.admin_chat_id, text=message)
 
 
-async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_user_name(update)
     message = update.message
     if message:

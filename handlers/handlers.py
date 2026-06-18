@@ -37,7 +37,7 @@ def register_handlers(app):
 
 def check_maintenance(func):
     @wraps(func)
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if bot_state.maintenance_mode:
             await update.message.reply_text("🚧 Сервер на обслуживании. Попробуйте выполнить запрос позже.")
             return None
@@ -59,7 +59,7 @@ def check_permissions(func):
     return wrapper
 
 @log_command("/start")
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
     if chat_type != 'private':
         return  # Не отвечаем на start в группе
@@ -71,7 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ig
     await update.message.reply_text("👋 Бот запущен.")
 
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sticker_pack_id = "Yobba"
     sticker_ids = [
         "CAACAgIAAxkBAAE3z4lodieCM47W6bHinF93tjxkGRqDmQACKgEAAhIWYQqnJ3JCb4AUqDYE",
@@ -97,7 +97,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ign
 
 
 @log_command("/addgroup")
-async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
@@ -116,7 +116,7 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
 
 @log_command("/adduser")
-async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может добавлять пользователей.")
         return
@@ -147,7 +147,7 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
 
 
 @log_command("/removegroup")
-async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
@@ -165,7 +165,7 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 
 
 @log_command("/removeuser")
-async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка прав администратора
     if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может удалять пользователей.")
@@ -198,7 +198,7 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):  # typ
 
 
 @log_command("/authorized")
-async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка прав администратора
     if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Только администратор может просматривать этот список.")
@@ -232,7 +232,7 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):  
 @check_maintenance
 @check_permissions
 @log_command("/poweron")
-async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
 
     if len(context.args) == 1 and context.args[0] == "force":  # type: ignore
@@ -305,7 +305,7 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: 
 
 
 @log_command("/poweroff")
-async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /poweroff"""
 
     # Проверка прав
@@ -368,7 +368,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 @check_maintenance
 @check_permissions
 @log_command("/status")
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     now = time.time()
     if now - vps_service.vps_state.last_status_time < bot_config.status_cooldown:
@@ -429,7 +429,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: i
 
 
 @log_command("/maintain")
-async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
         return
@@ -445,7 +445,7 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):  # ty
 
 @check_permissions
 @log_command("/mute")
-async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type: ignore
+async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.effective_chat.type != 'private' and update.effective_user.id != bot_config.admin_chat_id:
         await update.message.reply_text("⛔ В группах и каналах команда доступна только администратору.")

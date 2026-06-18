@@ -1,5 +1,8 @@
+import logging
 import os
 import aiohttp
+
+logger = logging.getLogger(__name__)
 
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN")
@@ -31,6 +34,8 @@ async def api_request(action: str):
                 if response.status == 200:
                     return await response.json()
                 error_text = await response.text()
+                logger.error(f"API error {response.status}: {error_text}")
                 return {"error": f"API error {response.status}: {error_text}"}
     except Exception as e:
+        logger.error(f"Connection error: {str(e)}")
         return {"error": f"Connection error: {str(e)}"}

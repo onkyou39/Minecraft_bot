@@ -16,8 +16,7 @@ logging.basicConfig(
 )
 
 
-logger = logging.getLogger("watchdog")
-#logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 
@@ -102,7 +101,7 @@ async def shutdown_all():
     reset_watchdog_state()
     mc_server.reset_runtime()
     bot_state.active_chats.clear()
-    logger.info("Watchdog shutdown initiated successfully")
+    logger.info("VPS and watchdog shutdown initiated successfully")
     return result
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):

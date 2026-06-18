@@ -25,6 +25,7 @@ async def shutdown_vps():
         return result  # ничего не трогаем
     # считаем, что shutdown инициирован успешно
     vps_state.last_poweron_time = now  # предотвращение быстрого запуска VPS после включения
+    logger.info(f"VPS shutdown initiated successfully")
     return result
 
 async def poweron_vps():
