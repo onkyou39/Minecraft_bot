@@ -1,7 +1,6 @@
 import logging
-from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder
-from config.config import bot_config
+import config.config as config
 from services.watchdog import watchdog_state
 from handlers.handlers import register_handlers
 
@@ -16,10 +15,10 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+#logger.setLevel(logging.INFO)
 
 if __name__ == "__main__":
-    application = ApplicationBuilder().token(bot_config.telegram_token).build()
+    application = ApplicationBuilder().token(config.bot_config.telegram_token).build()
     if watchdog_state.job_queue is None:
         watchdog_state.job_queue = application.job_queue
     register_handlers(application)

@@ -342,7 +342,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):  # type:
 
         elif is_power_on:
             # Отправка запроса на выключение
-            result = await vps_service.shutdown_vps()
+            result = await watchdog.shutdown_all()
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
                 return

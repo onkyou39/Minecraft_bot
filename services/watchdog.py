@@ -2,7 +2,6 @@ import asyncio
 import logging
 import time
 from typing import Optional
-from dotenv import load_dotenv
 from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
@@ -11,7 +10,6 @@ from services import vps_service
 from state.minecraft_server import mc_server
 from state.bot_state import bot_state
 
-load_dotenv()
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     level=logging.INFO
@@ -95,7 +93,7 @@ def watchdog_stop():
         watchdog_state.watchdog_job = None
         logger.info("Removed watchdog job")
 
-async def watchdog_shutdown():
+async def shutdown_all():
     result = await vps_service.shutdown_vps()
     if "error" in result:
         logger.error(f"Failed to shutdown VPS: {result['error']}")
@@ -107,18 +105,19 @@ async def watchdog_shutdown():
     logger.info("Watchdog shutdown initiated successfully")
     return result
 
-async def watchdog_notifyer(message: str):
+async def watchdog_notifier(message: str):
     try:
         #for chat_id in list(authorized_groups.union(authorized_users.keys())):
         for chat_id in bot_state.active_chats:
             if chat_id:
-                await application.bot.send_message(chat_id=chat_id, text=message)  # type: ignore
+                # FIXME
+                await application.bot.send_message(chat_id=chat_id, text=message)
         logger.debug(f"Watchdog sent notification: {message}")
     except Exception as e:
         logger.debug(f"Watchdog notification failed: {str(e)}")
 
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue
-    await watchdog_tick(watchdog_shutdown, watchdog_notifyer)
+    await watchdog_tick(shutdown_all, watchdog_notifier)
 
 def watchdog_run():
     if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
