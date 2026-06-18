@@ -5,7 +5,7 @@ from typing import Optional
 from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
-from telegram.ext import Job, JobQueue
+from telegram.ext import Job, JobQueue, ContextTypes
 from services import vps_service
 from state.minecraft_server import mc_server
 from state.bot_state import bot_state
@@ -105,19 +105,24 @@ async def shutdown_all():
     logger.info("Watchdog shutdown initiated successfully")
     return result
 
-async def watchdog_notifier(message: str):
-    try:
-        #for chat_id in list(authorized_groups.union(authorized_users.keys())):
-        for chat_id in bot_state.active_chats:
-            if chat_id:
-                # FIXME
-                await application.bot.send_message(chat_id=chat_id, text=message)
-        logger.debug(f"Watchdog sent notification: {message}")
-    except Exception as e:
-        logger.debug(f"Watchdog notification failed: {str(e)}")
-
-async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):  # type: ignore # Стандартная сигнатура для job_queue
-    await watchdog_tick(shutdown_all, watchdog_notifier)
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):
+    async def notifier(message: str):
+        if not bot_state.active_chats:
+            logger.debug("No active chats to notify")
+            return
+        for chat_id in list(bot_state.active_chats):
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message
+                )
+                logger.debug(f"Watchdog sent notification to {chat_id}: {message!r}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to send notification "
+                    f"to {chat_id}: {e}"
+                )
+    await watchdog_tick(shutdown_all, notifier)
 
 def watchdog_run():
     if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
