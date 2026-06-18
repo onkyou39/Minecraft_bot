@@ -5,7 +5,6 @@ from integrations import api
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
 
 @dataclass
 class VPSState:

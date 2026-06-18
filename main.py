@@ -29,7 +29,6 @@ logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-#logger.setLevel(logging.INFO)
 
 if __name__ == "__main__":
     application = ApplicationBuilder().token(config.bot_config.telegram_token).build()

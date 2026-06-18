@@ -4,7 +4,6 @@ import logging
 from telegram import Update
 
 logger = logging.getLogger(__name__)
-#logger.setLevel(logging.INFO)
 
 def log_command(command_name):
     def decorator(func):

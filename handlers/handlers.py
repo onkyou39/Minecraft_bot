@@ -16,7 +16,6 @@ from state.minecraft_server import mc_server
 mc_server.online = False
 
 logger = logging.getLogger(__name__)
-#logger.setLevel(logging.INFO)
 
 
 def register_handlers(app):
