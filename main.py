@@ -32,6 +32,8 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
+    if not config.bot_config.telegram_token:
+        raise RuntimeError("TELEGRAM_TOKEN is not configured")
     application = ApplicationBuilder().token(config.bot_config.telegram_token).build()
     watchdog_state.job_queue = application.job_queue
     register_handlers(application)

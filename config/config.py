@@ -11,8 +11,17 @@ class BotConfig:
     poweroff_cooldown: int = 1 * 60  # 1 минута
     status_cooldown: int = 5  # запрос статуса
     authorized_file: str = "authorized.json"
-    telegram_token: str = os.getenv("TELEGRAM_TOKEN")
-    admin_chat_id: int = int(os.getenv("ADMIN_CHAT_ID"))  # type: ignore
+    telegram_token: str | None = None
+    admin_chat_id: int | None = None
 
 
-bot_config = BotConfig()
+def load_config() -> BotConfig:
+    admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+
+    return BotConfig(
+        telegram_token=os.getenv("TELEGRAM_TOKEN"),
+        admin_chat_id=int(admin_chat_id) if admin_chat_id else None,
+    )
+
+
+bot_config = load_config()
