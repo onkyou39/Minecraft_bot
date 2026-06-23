@@ -2,7 +2,6 @@ import argparse
 import logging
 from telegram.ext import ApplicationBuilder
 import config.config as config
-from services.watchdog import watchdog_state
 from handlers.handlers import register_handlers
 
 
