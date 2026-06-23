@@ -13,5 +13,5 @@ sudo docker run [-d --name minecraft_bot --memory="128m" --cpus="0.5" --restart 
 
 ##### Copying authorization config
 ```shell
-sudo docker cp minecraft_bot:/app/authorized.json .
+sudo docker cp minecraft-bot:/app/authorized.json .
 ```
