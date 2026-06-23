@@ -7,9 +7,25 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ----------------------------
-# Config
+# Config & Argument Parsing
 # ----------------------------
 CONTAINER_NAME="minecraft-bot"
+BOT_ARGS=()  # Array to store arguments passed directly to the Docker container CMD
+
+# Parse command-line arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --debug)
+      BOT_ARGS+=("--debug")  # Append flag to the array
+      shift 1
+      ;;
+    *)
+      echo "❌ Unknown argument: $1"
+      echo "Usage: $0 [--debug]"
+      exit 1
+      ;;
+  esac
+done
 
 # Try to get git commit hash for image tagging
 # fallback to "latest" if not in git repo
@@ -18,6 +34,9 @@ IMAGE_NAME="$CONTAINER_NAME:$IMAGE_TAG"
 
 echo "📦 Starting deployment of $CONTAINER_NAME..."
 echo "🏷️ Image tag: $IMAGE_TAG"
+if [ ${#BOT_ARGS[@]} -gt 0 ]; then
+  echo "⚙️ Passing arguments to bot: ${BOT_ARGS[*]}"
+fi
 
 # ----------------------------
 # Detect existing container
@@ -71,7 +90,8 @@ docker run -d \
   --cpus="0.5" \
   --restart unless-stopped \
   --env-file .env \
-  "$CONTAINER_NAME:latest"
+  "$CONTAINER_NAME:latest" \
+  "${BOT_ARGS[@]}"
 
 # ----------------------------
 # Health check (basic)
@@ -111,7 +131,8 @@ else
           --cpus="0.5" \
           --restart unless-stopped \
           --env-file .env \
-          "$OLD_IMAGE_ID"
+          "$OLD_IMAGE_ID" \
+          "${BOT_ARGS[@]}"
 
         # Moving the last tag back to the old stable image.
         docker tag "$OLD_IMAGE_ID" "$CONTAINER_NAME:latest"
