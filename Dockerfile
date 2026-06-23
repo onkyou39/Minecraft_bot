@@ -53,4 +53,5 @@ USER appuser
 # EXPOSE 8000
 
 # Run the application.
-CMD ["python3", "main.py"]
+ENTRYPOINT ["python3", "main.py"]
+CMD []
