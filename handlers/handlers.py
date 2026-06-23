@@ -261,7 +261,10 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_power_on = server_status.get("IsPowerOn")
         if is_power_on:
             await update.message.reply_text("✅ Сервер уже включен.")
-            watchdog.watchdog_run()
+            job_queue = context.job_queue # без выделения в отдельную переменную ругается линтер
+            if job_queue is None:
+                raise RuntimeError("JobQueue is not available")
+            watchdog.watchdog_run(job_queue)
             vps_service.vps_state.last_status_time = now
             return
         elif is_power_on is False:
@@ -281,7 +284,10 @@ async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bot_state.active_chats.discard(update.effective_chat.id)  # Сброс уведомлений при ошибке
                 return
 
-            watchdog.watchdog_run()
+            job_queue = context.job_queue
+            if job_queue is None:
+                raise RuntimeError("JobQueue is not available")
+            watchdog.watchdog_run(job_queue)
 
             state = result.get("State", "Unknown")
             if state == "InProgress":
@@ -396,7 +402,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         if is_power_on and not context.chat_data.get("muted", False):
             bot_state.active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
-            watchdog.watchdog_run()
+            job_queue = context.job_queue
+            if job_queue is None:
+                raise RuntimeError("JobQueue is not available")
+            watchdog.watchdog_run(job_queue)
             if mc_server.online:
                 message = (
                     f"🟢 Сервер включен. "

@@ -10,14 +10,8 @@ from services import vps_service
 from state.minecraft_server import mc_server
 from state.bot_state import bot_state
 
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    level=logging.INFO
-)
-
 
 logger = logging.getLogger(__name__)
-
 
 
 async def fast_check(host: str, port: int, timeout: float = 2.0):
@@ -75,7 +69,6 @@ class WatchdogState:
     is_fresh_start: bool = True
     crashed: int = 0  # Сервер упал или ещё не запустился.
     watchdog_job: Optional[Job] = None
-    job_queue: Optional[JobQueue] = None
 
     def reset(self):
         for f in fields(self):
@@ -123,10 +116,11 @@ async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):
                 )
     await watchdog_tick(shutdown_all, notifier)
 
-def watchdog_run():
+def watchdog_run(job_queue: JobQueue):
     if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
-        watchdog_state.watchdog_job = watchdog_state.job_queue.run_repeating(watchdog_task, interval=60, first=10, name="minecraft_watchdog",
-                                               job_kwargs={'misfire_grace_time': 2})
+        watchdog_state.watchdog_job = job_queue.run_repeating(watchdog_task, interval=60,
+                                                                             first=10, name="minecraft_watchdog",
+                                                                             job_kwargs={'misfire_grace_time': 2})
         logger.info("Started watchdog job")
 
 

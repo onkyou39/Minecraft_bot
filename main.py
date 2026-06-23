@@ -35,7 +35,6 @@ if __name__ == "__main__":
     if not config.bot_config.telegram_token:
         raise RuntimeError("TELEGRAM_TOKEN is not configured")
     application = ApplicationBuilder().token(config.bot_config.telegram_token).build()
-    watchdog_state.job_queue = application.job_queue
     register_handlers(application)
     application.run_polling(poll_interval=1, timeout=30)
     #application.run_polling()
