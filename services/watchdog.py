@@ -1,22 +1,17 @@
 import asyncio
 import logging
 import time
-from dotenv import load_dotenv
+from typing import Optional
 from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
-from minecraft_server import mc_server
-
-load_dotenv()
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    level=logging.INFO
-)
+from telegram.ext import Job, JobQueue, ContextTypes
+from services import vps_service
+from state.minecraft_server import mc_server
+from state.bot_state import bot_state
 
 
-logger = logging.getLogger("watchdog")
-logger.setLevel(logging.INFO)
-
+logger = logging.getLogger(__name__)
 
 
 async def fast_check(host: str, port: int, timeout: float = 2.0):
@@ -36,8 +31,8 @@ async def fast_check(host: str, port: int, timeout: float = 2.0):
         logger.exception(f"Watchdog: port fast check — unknown exception: {e}")
         return None
 
-async def get_mc_server_status(server_address: str = mc_server.server_address,
-                               port: int = mc_server.query_port):
+async def refresh_mc_server_state(server_address: str = mc_server.server_address,
+                                  port: int = mc_server.query_port):
     is_open = await fast_check(server_address, port, timeout=2)
     if is_open:
         try:
@@ -73,12 +68,60 @@ class WatchdogState:
     warning_3m_sent: bool = False  # Предупреждение за 3 минуты до отключения
     is_fresh_start: bool = True
     crashed: int = 0  # Сервер упал или ещё не запустился.
+    watchdog_job: Optional[Job] = None
 
     def reset(self):
         for f in fields(self):
             setattr(self, f.name, f.default)
 
 watchdog_state = WatchdogState()
+
+def watchdog_stop():
+
+    mc_server.shutdown_remaining = None # Сброс runtime состояния minecraft сервера
+
+    if watchdog_state.watchdog_job is not None:
+        watchdog_state.watchdog_job.schedule_removal()
+        watchdog_state.watchdog_job = None
+        logger.info("Removed watchdog job")
+
+async def shutdown_all():
+    result = await vps_service.shutdown_vps()
+    if "error" in result:
+        logger.error(f"Failed to shutdown VPS: {result['error']}")
+        return result
+    watchdog_stop()
+    reset_watchdog_state()
+    mc_server.reset_runtime()
+    bot_state.active_chats.clear()
+    logger.info("VPS and watchdog shutdown initiated successfully")
+    return result
+
+async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):
+    async def notifier(message: str):
+        if not bot_state.active_chats:
+            logger.debug("No active chats to notify")
+            return
+        for chat_id in list(bot_state.active_chats):
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message
+                )
+                logger.debug(f"Watchdog sent notification to {chat_id}: {message!r}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to send notification "
+                    f"to {chat_id}: {e}"
+                )
+    await watchdog_tick(shutdown_all, notifier)
+
+def watchdog_run(job_queue: JobQueue):
+    if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
+        watchdog_state.watchdog_job = job_queue.run_repeating(watchdog_task, interval=60,
+                                                                             first=10, name="minecraft_watchdog",
+                                                                             job_kwargs={'misfire_grace_time': 2})
+        logger.info("Started watchdog job")
 
 
 def reset_watchdog_state():
@@ -87,7 +130,7 @@ def reset_watchdog_state():
 
 async def watchdog_tick(shutdown_callback, notify_callback=None):
     logger.debug("Watchdog tick.")
-    await get_mc_server_status()
+    await refresh_mc_server_state()
     now = time.time()
 
     if mc_server.online:

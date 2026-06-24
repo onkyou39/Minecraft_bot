@@ -11,7 +11,7 @@ class MinecraftServer:
     version_number: str = ""
     # runtime state
     online: bool = False
-    players_online: int | None  = None
+    players_online: int | None = None
     last_check: float | None = None # Пока не используется
     shutdown_remaining: int | None = None # Осталось до перезапуска
 
