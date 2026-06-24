@@ -8,7 +8,7 @@
 
 #ARG PYTHON_VERSION=3.13.6
 #FROM python:${PYTHON_VERSION}-slim AS base
-FROM python:3.13.13-slim AS base
+FROM python:3.14.6-slim AS base
 
 # Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
