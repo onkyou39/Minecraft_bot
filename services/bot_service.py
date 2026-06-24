@@ -1,3 +1,4 @@
+from functools import wraps
 from telegram.ext import ContextTypes
 from config.config import bot_config
 import json
@@ -8,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 def log_command(command_name):
     def decorator(func):
+        @wraps(func)
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
             logger.info(f"{get_user_name(update)} sent COMMAND {command_name}")
             return await func(update, context, *args, **kwargs)

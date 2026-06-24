@@ -12,9 +12,6 @@ import random
 from state.minecraft_server import mc_server
 
 
-# Кэшированный статус Minecraft-сервера
-mc_server.online = False
-
 logger = logging.getLogger(__name__)
 
 
