@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 import time
 from services import watchdog
@@ -157,3 +159,40 @@ async def test_failed_server_status(monkeypatch):
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert state["notified"] is None
 
+
+def test_watchdog_run_creates_job():
+    job_queue = Mock()
+    watchdog_job = Mock()
+    job_queue.run_repeating.return_value = watchdog_job
+    watchdog.watchdog_state.reset()
+    watchdog.watchdog_run(job_queue)
+    job_queue.run_repeating.assert_called_once()
+    assert watchdog.watchdog_state.watchdog_job is watchdog_job
+
+
+def test_watchdog_run_does_not_create_second_job():
+    job_queue = Mock()
+    watchdog_job = Mock()
+    job_queue.run_repeating.return_value = watchdog_job
+    watchdog.watchdog_state.watchdog_job = watchdog_job
+    watchdog.watchdog_run(job_queue)
+    job_queue.run_repeating.assert_not_called()
+
+
+def test_watchdog_can_restart_after_shutdown():
+    job_queue = Mock()
+    watchdog_job = Mock()
+    job_queue.run_repeating.return_value = watchdog_job
+    watchdog.watchdog_state.reset()
+
+    # первый запуск
+    watchdog.watchdog_run(job_queue)
+
+    # эмулируем shutdown
+    watchdog.watchdog_state.watchdog_job = None
+    watchdog.reset_watchdog_state()
+
+    # повторный запуск
+    watchdog.watchdog_run(job_queue)
+
+    assert watchdog.watchdog_state.watchdog_job is watchdog_job
