@@ -389,7 +389,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         vps_service.vps_state.last_status_time = now  # обновляем время успешного запроса статуса
         is_power_on = server_status.get("IsPowerOn")
-        logger.debug(f"server_status={server_status}")
         logger.debug(
             f"IsPowerOn={is_power_on}, type={type(is_power_on)}"
         )
