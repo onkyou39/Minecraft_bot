@@ -40,7 +40,7 @@ RUN adduser \
 #    python -m pip install -r requirements.txt
 
 COPY requirements.txt .
-RUN python -m pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 # Copy the source code into the container.
 COPY . .
