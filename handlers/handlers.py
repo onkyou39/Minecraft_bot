@@ -344,7 +344,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif is_power_on:
             # Отправка запроса на выключение
-            result = await watchdog.shutdown_all()
+            result = await bot_service.shutdown_all(context.application)
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
                 return
