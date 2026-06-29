@@ -6,7 +6,7 @@ from mcstatus import JavaServer
 from re import search
 from dataclasses import dataclass, fields
 from telegram.ext import Job, JobQueue, ContextTypes
-from services import vps_service
+from services import bot_service
 from state.minecraft_server import mc_server
 from state.bot_state import bot_state
 
@@ -85,18 +85,6 @@ def watchdog_stop():
         watchdog_state.watchdog_job = None
         logger.info("Removed watchdog job")
 
-async def shutdown_all():
-    result = await vps_service.shutdown_vps()
-    if "error" in result:
-        logger.error(f"Failed to shutdown VPS: {result['error']}")
-        return result
-    watchdog_stop()
-    reset_watchdog_state()
-    mc_server.reset_runtime()
-    bot_state.active_chats.clear()
-    logger.info("VPS and watchdog shutdown initiated successfully")
-    return result
-
 async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):
     async def notifier(message: str):
         if not bot_state.active_chats:
@@ -114,7 +102,11 @@ async def watchdog_task(context: ContextTypes.DEFAULT_TYPE):
                     f"Failed to send notification "
                     f"to {chat_id}: {e}"
                 )
-    await watchdog_tick(shutdown_all, notifier)
+
+    async def shutdown_bot():
+        await bot_service.shutdown_all(context.application)
+
+    await watchdog_tick(shutdown_bot, notifier)
 
 def watchdog_run(job_queue: JobQueue):
     if watchdog_state.watchdog_job is None and not bot_state.maintenance_mode:
