@@ -74,12 +74,14 @@ async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def reset_chat_state(application: Application):
+    """Сбрасывает статус muted для всех чатов"""
     for chat_id, chat_data in application.chat_data.items():
         if chat_data.pop("muted", None) is not None:
             logger.debug(f"Successfully reset muted state for chat {chat_id}")
 
 
-async def shutdown_all(chat_state: Application):
+async def shutdown_all(application: Application):
+    """Полное выключение: VPS + watchdog + сброс состояния"""
     result = await vps_service.shutdown_vps()
     if "error" in result:
         logger.error(f"Failed to shutdown VPS: {result['error']}")
@@ -88,6 +90,6 @@ async def shutdown_all(chat_state: Application):
     watchdog.reset_watchdog_state()
     minecraft_server.mc_server.reset_runtime()
     tg_bot_state.bot_state.active_chats.clear()
-    reset_chat_state(chat_state)
+    reset_chat_state(application)
     logger.info("VPS and watchdog shutdown initiated successfully")
     return result
