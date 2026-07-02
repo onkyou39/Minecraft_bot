@@ -344,7 +344,7 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif is_power_on:
             # Отправка запроса на выключение
-            result = await watchdog.shutdown_all()
+            result = await bot_service.shutdown_all(context.application)
             if "error" in result:
                 await update.message.reply_text(f"⚠️ Ошибка: {result['error']}")
                 return
@@ -396,8 +396,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"mc_server.online={mc_server.online}, "
             f"chat_muted={context.chat_data.get('muted', False)}"
         )
-        if is_power_on and not context.chat_data.get("muted", False):
-            bot_state.active_chats.add(update.effective_chat.id) # добавляем чат для уведомлений только если сервер активен
+        if is_power_on:
+            if not context.chat_data.get("muted", False):
+                # добавляем чат для уведомлений только если сервер активен
+                bot_state.active_chats.add(update.effective_chat.id)
             job_queue = context.job_queue
             if job_queue is None:
                 raise RuntimeError("JobQueue is not available")

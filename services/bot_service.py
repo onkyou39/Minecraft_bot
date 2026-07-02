@@ -1,11 +1,14 @@
 from functools import wraps
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, Application
 from config.config import bot_config
 import json
 import logging
 from telegram import Update
+from services import vps_service, watchdog
+from state import minecraft_server, bot_state as tg_bot_state
 
 logger = logging.getLogger(__name__)
+
 
 def log_command(command_name):
     def decorator(func):
@@ -17,6 +20,7 @@ def log_command(command_name):
         return wrapper
 
     return decorator
+
 
 def load_auth_data():
     try:
@@ -67,3 +71,25 @@ async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if message:
         logger.info(f"[{user_name}] написал: {message.text or '[нет текста]'}")
+
+
+def reset_chat_state(application: Application):
+    """Сбрасывает статус muted для всех чатов"""
+    for chat_id, chat_data in application.chat_data.items():
+        if chat_data.pop("muted", None) is not None:
+            logger.debug(f"Successfully reset muted state for chat {chat_id}")
+
+
+async def shutdown_all(application: Application):
+    """Полное выключение: VPS + watchdog + сброс состояния"""
+    result = await vps_service.shutdown_vps()
+    if "error" in result:
+        logger.error(f"Failed to shutdown VPS: {result['error']}")
+        return result
+    watchdog.watchdog_stop()
+    watchdog.reset_watchdog_state()
+    minecraft_server.mc_server.reset_runtime()
+    tg_bot_state.bot_state.active_chats.clear()
+    reset_chat_state(application)
+    logger.info("VPS and watchdog shutdown initiated successfully")
+    return result
