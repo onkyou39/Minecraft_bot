@@ -52,7 +52,7 @@ async def test_empty_server_timer_not_expired(monkeypatch):
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.empty_since = time.time() - watchdog.mc_server.wd_poweroff_cooldown + 120
     watchdog.watchdog_state.is_fresh_start = False
-    watchdog.watchdog_state.warning_3m_sent = False
+    watchdog.watchdog_state.warning_remaining_sent = False
 
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert "никого нет" in state["notified"]
@@ -75,7 +75,7 @@ async def test_empty_server_shutdown(monkeypatch):
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.empty_since = time.time() - watchdog.mc_server.wd_poweroff_cooldown - 5
     watchdog.watchdog_state.is_fresh_start = False
-    watchdog.watchdog_state.warning_3m_sent = False
+    watchdog.watchdog_state.warning_remaining_sent = False
 
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert "выключен" in state["notified"]
@@ -100,7 +100,7 @@ async def test_server_crashed(monkeypatch):
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.crashed = crashes["count"]
     watchdog.watchdog_state.is_fresh_start = False
-    watchdog.watchdog_state.warning_3m_sent = False
+    watchdog.watchdog_state.warning_remaining_sent = False
 
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert "временно недоступен" in state["notified"]
@@ -124,7 +124,7 @@ async def test_first_start(monkeypatch):
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.crashed = 0
     watchdog.watchdog_state.is_fresh_start = True
-    watchdog.watchdog_state.warning_3m_sent = False
+    watchdog.watchdog_state.warning_remaining_sent = False
 
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert "запускается" in state["notified"]
@@ -154,7 +154,7 @@ async def test_failed_server_status(monkeypatch):
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.crashed = crashes["count"]
     watchdog.watchdog_state.is_fresh_start = False
-    watchdog.watchdog_state.warning_3m_sent = False
+    watchdog.watchdog_state.warning_remaining_sent = False
 
     await watchdog.watchdog_tick(shutdown_cb, notify_cb)
     assert state["notified"] is None
