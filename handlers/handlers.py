@@ -150,57 +150,70 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может удалить группу.")
         return
 
-    # Режим 1: Использование в группе без аргументов - удалить текущую группу
+    # Удаление текущей группы
     if update.effective_chat.type in ["group", "supergroup"] and not context.args:
-        if update.effective_chat.id in bot_service.authorized_groups:
-            bot_service.authorized_groups.remove(update.effective_chat.id)
-            bot_service.save_auth_data()
-            await update.message.reply_text("✅ Группа удалена из списка разрешённых.")
-        else:
+        group_id = update.effective_chat.id
+
+        if group_id not in bot_service.authorized_groups:
             await update.message.reply_text("ℹ️ Группа не была в списке.")
+            return
+
+        group_name = bot_service.authorized_groups.pop(group_id)
+        bot_service.save_auth_data()
+
+        await update.message.reply_text(f"✅ Группа «{group_name}» удалена.")
         return
 
-    # Режим 2: Команда с аргументами (работает только в приватном чате)
-    if update.effective_chat.type != 'private' and context.args:
-        await update.message.reply_text("❗ Команду с аргументами можно использовать только в приватном чате с ботом.")
+    # Все остальные режимы работают только в личных сообщениях
+    if update.effective_chat.type != "private":
+        await update.message.reply_text(
+            "❗ Используйте:\n"
+            "• /removegroup — в группе\n"
+            "• /removegroup <номер|id> — в личном чате"
+        )
         return
 
     if not context.args:
         await update.message.reply_text(
-            "ℹ️ Использование:\n"
-            "1️⃣ /removegroup (в группе) - удалит текущую группу\n"
-            "2️⃣ /removegroup <group_id> (в ЛС) - удалит группу по ID\n"
-            "3️⃣ /removegroup clear (в ЛС) - очистит весь список групп"
+            "Использование:\n"
+            "/removegroup <номер>\n"
+            "/removegroup <group_id>"
         )
         return
 
-    # Аргумент 'clear' - очистить весь список
-    if context.args[0].lower() == "clear":
-        if not bot_service.authorized_groups:
-            await update.message.reply_text("ℹ️ Список групп уже пуст.")
-            return
+    arg = context.args[0]
 
-        groups_count = len(bot_service.authorized_groups)
-        bot_service.authorized_groups.clear()
+    if not arg.lstrip("-").isdigit():
+        await update.message.reply_text(
+            "⛔ Номер или ID группы должны быть числом."
+        )
+        return
+
+    value = int(arg)
+
+    # ---------- Удаление по ID ----------
+    if value in bot_service.authorized_groups:
+        group_name = bot_service.authorized_groups.pop(value)
         bot_service.save_auth_data()
-        await update.message.reply_text(f"✅ Список групп очищен. Удалено {groups_count} групп(ы).")
+
+        await update.message.reply_text(
+            f"✅ Группа «{group_name}» удалена."
+        )
         return
 
-    # Аргумент - ID группы для удаления
-    group_id_str = context.args[0]
-    if not group_id_str.lstrip("-").isdigit():
-        await update.message.reply_text("⛔ Аргумент должен быть числом (ID группы) или словом 'clear'.")
+    # ---------- Удаление по номеру ----------
+    groups = list(bot_service.authorized_groups.items())
+
+    if 1 <= value <= len(groups):
+        group_id, group_name = groups[value - 1]
+
+        bot_service.authorized_groups.pop(group_id)
+        bot_service.save_auth_data()
+
+        await update.message.reply_text(f"✅ Группа «{group_name}» удалена.")
         return
 
-    group_id = int(group_id_str)
-
-    if group_id not in bot_service.authorized_groups:
-        await update.message.reply_text(f"ℹ️ Группа с ID {group_id} не найдена в списке.")
-        return
-
-    bot_service.authorized_groups.remove(group_id)
-    bot_service.save_auth_data()
-    await update.message.reply_text(f"✅ Группа {group_id} удалена из списка разрешённых.")
+    await update.message.reply_text("ℹ️ Группа не найдена.")
 
 
 @log_command("/removeuser")
