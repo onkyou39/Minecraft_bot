@@ -1,7 +1,7 @@
 aiohappyeyeballs==2.6.2
 aiohttp==3.14.3
 aiosignal==1.4.0
-anyio==4.14.1
+anyio==4.14.2
 APScheduler==3.11.2
 asyncio-dgram==3.0.0
 attrs==26.1.0
