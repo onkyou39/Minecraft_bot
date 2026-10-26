@@ -145,28 +145,29 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/removegroup")
 async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверка прав администратора
+    msg = update.effective_message
+    chat = update.effective_chat
+    groups_db = bot_service.authorized_groups
+
     if update.effective_user.id != bot_config.admin_chat_id:
-        await update.message.reply_text("⛔ Только администратор может удалить группу.")
+        await msg.reply_text("⛔ Только администратор может удалить группу.")
         return
 
-    # Удаление текущей группы
-    if update.effective_chat.type in ["group", "supergroup"] and not context.args:
-        group_id = update.effective_chat.id
-
-        if group_id not in bot_service.authorized_groups:
-            await update.message.reply_text("ℹ️ Группа не была в списке.")
-            return
-
-        group_name = bot_service.authorized_groups.pop(group_id)
+    def remove(group_id: int) -> str:
+        group_name = groups_db.pop(group_id)
         bot_service.save_auth_data()
+        return f"✅ Группа «{group_name}» удалена."
 
-        await update.message.reply_text(f"✅ Группа «{group_name}» удалена.")
+    # Текущая группа
+    if chat.type in ("group", "supergroup") and not context.args:
+        if chat.id not in groups_db:
+            await msg.reply_text("ℹ️ Группа не была в списке.")
+            return
+        await msg.reply_text(remove(chat.id))
         return
 
-    # Все остальные режимы работают только в личных сообщениях
-    if update.effective_chat.type != "private":
-        await update.message.reply_text(
+    if chat.type != "private":
+        await msg.reply_text(
             "❗ Используйте:\n"
             "• /removegroup — в группе\n"
             "• /removegroup <номер|id> — в личном чате"
@@ -174,46 +175,31 @@ async def removegroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text(
-            "Использование:\n"
-            "/removegroup <номер>\n"
-            "/removegroup <group_id>"
+        await msg.reply_text(
+            "Использование:\n/removegroup <номер>\n/removegroup <group_id>"
         )
         return
 
-    arg = context.args[0]
-
-    if not arg.lstrip("-").isdigit():
-        await update.message.reply_text(
-            "⛔ Номер или ID группы должны быть числом."
-        )
+    try:
+        value = int(context.args[0])
+    except ValueError:
+        await msg.reply_text("⛔ Номер или ID группы должны быть числом.")
         return
 
-    value = int(arg)
-
-    # ---------- Удаление по ID ----------
-    if value in bot_service.authorized_groups:
-        group_name = bot_service.authorized_groups.pop(value)
-        bot_service.save_auth_data()
-
-        await update.message.reply_text(
-            f"✅ Группа «{group_name}» удалена."
-        )
+    # Отрицательное число — ID, положительное — номер в списке
+    if value < 0:
+        if value in groups_db:
+            await msg.reply_text(remove(value))
+        else:
+            await msg.reply_text("ℹ️ Группа не найдена.")
         return
 
-    # ---------- Удаление по номеру ----------
-    groups = list(bot_service.authorized_groups.items())
-
+    groups = list(groups_db)
     if 1 <= value <= len(groups):
-        group_id, group_name = groups[value - 1]
-
-        bot_service.authorized_groups.pop(group_id)
-        bot_service.save_auth_data()
-
-        await update.message.reply_text(f"✅ Группа «{group_name}» удалена.")
+        await msg.reply_text(remove(groups[value - 1]))
         return
 
-    await update.message.reply_text("ℹ️ Группа не найдена.")
+    await msg.reply_text("ℹ️ Группа не найдена.")
 
 
 @log_command("/removeuser")
@@ -226,27 +212,34 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверка наличия ровно одного аргумента
     if len(context.args) != 1:  # type: ignore
         await update.message.reply_text(
-            "ℹ️ Использование: /removeuser user_id\n"
-            "Пример: /removeuser 12345"
+            "ℹ️ Использование: /removeuser <номер>\n"
+            "Номер смотрите в списке /authorized\n"
+            "Пример: /removeuser 2"
         )
         return
 
-    user_id = context.args[0]
-    if not user_id.isdigit():
-        await update.message.reply_text("⛔ user_id должен быть числом.")
+    try:
+        number = int(context.args[0])  # type: ignore
+    except ValueError:
+        await update.message.reply_text("⛔ Номер должен быть числом.")
         return
 
-    if int(user_id) not in bot_service.authorized_users:
-        await update.message.reply_text(f"ℹ️ Пользователь {user_id} не найден в списке.")
+    users = list(bot_service.authorized_users.items())
+
+    if not 1 <= number <= len(users):
+        await update.message.reply_text(
+            f"ℹ️ Пользователь с номером {number} не найден. Проверьте список: /authorized"
+        )
         return
 
-    # Удаляем пользователя
-    bot_service.authorized_users.pop(int(user_id))
+    user_id, username = users[number - 1]
 
-    # Сохраняем изменения
+    # Удаляем пользователя и сохраняем изменения
+    bot_service.authorized_users.pop(user_id)
     bot_service.save_auth_data()
 
-    await update.message.reply_text(f"✅ Пользователь {user_id} удалён.")
+    label = f"{user_id}" + (f" (@{username})" if username else "")
+    await update.message.reply_text(f"✅ Пользователь {label} удалён.")
 
 
 @log_command("/authorized")
@@ -258,19 +251,26 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = ["📋 Список авторизованных:"]
 
-    # Список пользователей с именами, если есть
+    # Список пользователей с именами, если есть (нумерация = порядок сортировки по ID)
     if bot_service.authorized_users:
         users_list = "\n".join(
-            f"👤 {user_id}" + (f" (@{username})" if username else "")
-            for user_id, username in sorted(bot_service.authorized_users.items(), key=lambda x: int(x[0]))
+            f"{i}. 👤 {user_id}" + (f" (@{username})" if username else "")
+            for i, (user_id, username) in enumerate(
+                bot_service.authorized_users.items(), start=1
+            )
         )
         message.append(f"\n🔹 Пользователи ({len(bot_service.authorized_users)}):\n{users_list}")
     else:
         message.append("\n🔹 Пользователи: список пуст")
 
-    # Список групп
+    # Список групп (порядок и нумерация совпадают с /removegroup <номер>)
     if bot_service.authorized_groups:
-        groups_list = "\n".join(f"👥 {group_id}" for group_id in sorted(bot_service.authorized_groups))
+        groups_list = "\n".join(
+            f"{i}. 👥 {group_name} ({group_id})"
+            for i, (group_id, group_name) in enumerate(
+                bot_service.authorized_groups.items(), start=1
+            )
+        )
         message.append(f"\n🔹 Группы ({len(bot_service.authorized_groups)}):\n{groups_list}")
     else:
         message.append("\n🔹 Группы: список пуст")
