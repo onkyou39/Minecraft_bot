@@ -95,7 +95,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @log_command("/addgroup")
 async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type not in ["group", "supergroup"]:
+    chat = update.effective_chat
+
+    if chat.type not in ["group", "supergroup"]:
         await update.message.reply_text("❗ Эта команда работает только в группе.")
         return
 
@@ -103,11 +105,20 @@ async def addgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Только администратор может добавить группу.")
         return
 
-    if update.effective_chat.id in bot_service.authorized_groups:
-        await update.message.reply_text("ℹ️ Группа уже добавлена.")
+    title = chat.title or str(chat.id)
+    groups = bot_service.authorized_groups
+
+    if chat.id in groups:
+        if groups[chat.id] == title:
+            await update.message.reply_text("ℹ️ Группа уже добавлена.")
+            return
+        # Название изменилось или осталось ID из старого формата файла
+        groups[chat.id] = title
+        bot_service.save_auth_data()
+        await update.message.reply_text(f"✅ Название группы обновлено: «{title}».")
         return
 
-    bot_service.authorized_groups.add(update.effective_chat.id)
+    groups[chat.id] = title
     bot_service.save_auth_data()
     await update.message.reply_text("✅ Группа успешно добавлена в список разрешённых.")
 
