@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import time
 from typing import Optional
 from mcstatus import JavaServer
@@ -140,7 +141,12 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         if watchdog_state.empty_since is None:
             watchdog_state.empty_since = now
             logger.info("Watchdog: server is empty, starting shutdown timer")
-        elif now - watchdog_state.empty_since >= mc_server.wd_poweroff_cooldown:
+
+        deadline = watchdog_state.empty_since + mc_server.wd_poweroff_cooldown
+        remaining = max(0, math.ceil(deadline - now))
+        mc_server.shutdown_remaining = remaining
+
+        if now >= deadline:
             logger.warning("Watchdog: server remained empty, cooldown passed — shutting down VPS")
             if notify_callback:
                 await notify_callback(f"🔴 Сервер выключен после "
@@ -150,14 +156,19 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             watchdog_state.warning_shutdown_sent = False  # сбрасываем флаг после выключения
             watchdog_state.is_fresh_start = True # следующий запуск будет новым
             mc_server.shutdown_remaining = None
-        else:
-            mc_server.shutdown_remaining = int(mc_server.wd_poweroff_cooldown - (now - watchdog_state.empty_since))
-            logger.info(f"Watchdog: server still empty, {mc_server.shutdown_remaining} seconds left until shutdown")
-            if (mc_server.shutdown_remaining <= WATCHDOG_WARN_SECONDS
-                    and notify_callback and not watchdog_state.warning_shutdown_sent):
-                await notify_callback(f"ℹ️ На сервере никого нет. До выключения осталось "
-                                      f"{WATCHDOG_WARN_MINUTES} минут.")
-                watchdog_state.warning_shutdown_sent = True  # для однократного вывода
+            return
+
+        logger.info(
+            "Watchdog: server still empty, %s seconds left until shutdown",
+            remaining
+        )
+
+        if remaining <= WATCHDOG_WARN_SECONDS and notify_callback and not watchdog_state.warning_shutdown_sent:
+            await notify_callback(
+                f"ℹ️ На сервере никого нет. До выключения осталось "
+                f"{max(1, math.ceil(remaining / 60))} минут."
+            )
+            watchdog_state.warning_shutdown_sent = True # для однократного вывода
 
     elif mc_server.players_online is not None:
         if watchdog_state.empty_since is not None:
