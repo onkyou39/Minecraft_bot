@@ -319,3 +319,79 @@ async def test_warning_resent_after_server_blip(h):
     await h.tick()
 
     assert any("никого нет" in m for m in h.notifications)
+
+
+@pytest.mark.asyncio
+async def test_unreachable_shutdown_after_limit(h):
+    h.set_server(online=False, players=None)
+    limit = watchdog.WATCHDOG_UNREACHABLE_SECONDS
+
+    await h.tick()
+    h.advance(limit - 1)
+    await h.tick()
+    assert h.shutdowns == 0
+
+    h.advance(1)
+    await h.tick()
+
+    assert h.shutdowns == 1
+    assert any("недоступен более" in m for m in h.notifications)
+    assert watchdog.watchdog_state.is_fresh_start is True
+    assert watchdog.watchdog_state.crashed == 0
+    assert watchdog.watchdog_state.unreachable_since is None
+
+
+@pytest.mark.asyncio
+async def test_unreachable_timer_resets_when_server_returns(h):
+    limit = watchdog.WATCHDOG_UNREACHABLE_SECONDS
+
+    h.set_server(online=False, players=None)
+    await h.tick()
+    h.advance(limit - 60)
+
+    h.set_server(online=True, players=1)
+    await h.tick()                       # сервер ответил, таймер сброшен
+
+    h.set_server(online=False, players=None)
+    await h.tick()                       # новый отсчёт
+    h.advance(limit - 60)
+    await h.tick()
+
+    assert h.shutdowns == 0
+
+
+@pytest.mark.asyncio
+async def test_starting_message_after_unreachable_shutdown(h):
+    h.set_server(online=False, players=None)
+    await h.tick()
+    h.advance(watchdog.WATCHDOG_UNREACHABLE_SECONDS)
+    await h.tick()                       # выключение
+
+    h.notifications.clear()
+    await h.tick()                       # следующий запуск
+
+    assert any("запускается" in m for m in h.notifications)
+
+
+@pytest.mark.asyncio
+async def test_unreachable_shutdown_works_without_notify(h):
+    h.set_server(online=False, players=None)
+    await h.tick(None)
+    h.advance(watchdog.WATCHDOG_UNREACHABLE_SECONDS)
+    await h.tick(None)
+
+    assert h.shutdowns == 1
+
+
+def test_watchdog_stop_clears_timers():
+    watchdog.watchdog_state.empty_since = 1.0
+    watchdog.watchdog_state.unreachable_since = 1.0
+    watchdog.watchdog_state.warning_shutdown_sent = True
+    watchdog.mc_server.shutdown_remaining = 42
+
+    watchdog.watchdog_stop()
+
+    assert watchdog.watchdog_state.empty_since is None
+    assert watchdog.watchdog_state.unreachable_since is None
+    assert watchdog.watchdog_state.warning_shutdown_sent is False
+    assert watchdog.mc_server.shutdown_remaining is None
