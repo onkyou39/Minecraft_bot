@@ -4,6 +4,7 @@ import pytest
 import time
 from services import watchdog
 
+
 # для будущих тестов
 @pytest.fixture
 def clean_watchdog():
@@ -22,6 +23,7 @@ async def test_online_with_players(monkeypatch):
         watchdog.mc_server.players_online = 3
 
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
     monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
@@ -44,6 +46,7 @@ async def test_empty_server_timer_not_expired(monkeypatch):
         watchdog.mc_server.players_online = 0
 
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
     monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
@@ -68,6 +71,7 @@ async def test_empty_server_shutdown(monkeypatch):
         watchdog.mc_server.players_online = 0
 
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
     monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
@@ -93,6 +97,7 @@ async def test_server_crashed(monkeypatch):
         watchdog.mc_server.players_online = None
 
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
     monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
@@ -115,8 +120,8 @@ async def test_first_start(monkeypatch):
         watchdog.mc_server.online = False
         watchdog.mc_server.players_online = None
 
-
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
     monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_status)
@@ -146,10 +151,12 @@ async def test_failed_server_status(monkeypatch):
         return MockServer()
 
     async def notify_cb(msg): state["notified"] = msg
+
     async def shutdown_cb(): state["shutdown"] = True
 
-    monkeypatch.setattr(watchdog,"fast_check", mock_fast_check)
-    monkeypatch.setattr(watchdog.JavaServer,"async_lookup", mock_lookup)
+    monkeypatch.setattr(watchdog, "fast_check", mock_fast_check)
+    # noinspection PyUnresolvedReferences
+    monkeypatch.setattr(watchdog.JavaServer, "async_lookup", mock_lookup)
 
     watchdog.watchdog_state.reset()
     watchdog.watchdog_state.crashed = crashes["count"]
@@ -196,3 +203,63 @@ def test_watchdog_can_restart_after_shutdown():
     watchdog.watchdog_run(job_queue)
 
     assert watchdog.watchdog_state.watchdog_job is watchdog_job
+
+
+@pytest.mark.asyncio
+async def test_empty_server_remaining_uses_deadline_for_fractional_seconds(monkeypatch):
+    state = {"notified": None, "shutdown": False}
+    now = 1700000000.0
+
+    async def mock_refresh_mc_server_state():
+        watchdog.mc_server.online = True
+        watchdog.mc_server.players_online = 0
+
+    async def notify_cb(msg):
+        state["notified"] = msg
+
+    async def shutdown_cb():
+        state["shutdown"] = True
+
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
+    monkeypatch.setattr(watchdog.time, "time", lambda: now)
+
+    watchdog.watchdog_state.reset()
+    watchdog.watchdog_state.empty_since = now - watchdog.mc_server.wd_poweroff_cooldown + 0.1
+    watchdog.watchdog_state.is_fresh_start = False
+    watchdog.watchdog_state.warning_shutdown_sent = False
+
+    await watchdog.watchdog_tick(shutdown_cb, notify_cb)
+
+    assert "никого нет" in state["notified"]
+    assert watchdog.mc_server.shutdown_remaining == 1
+    assert not state["shutdown"]
+
+
+@pytest.mark.asyncio
+async def test_empty_server_shutdown_at_exact_deadline(monkeypatch):
+    state = {"notified": None, "shutdown": False}
+    now = 1700000000.0
+
+    async def mock_refresh_mc_server_state():
+        watchdog.mc_server.online = True
+        watchdog.mc_server.players_online = 0
+
+    async def notify_cb(msg):
+        state["notified"] = msg
+
+    async def shutdown_cb():
+        state["shutdown"] = True
+
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", mock_refresh_mc_server_state)
+    monkeypatch.setattr(watchdog.time, "time", lambda: now)
+
+    watchdog.watchdog_state.reset()
+    watchdog.watchdog_state.empty_since = now - watchdog.mc_server.wd_poweroff_cooldown
+    watchdog.watchdog_state.is_fresh_start = False
+    watchdog.watchdog_state.warning_shutdown_sent = False
+
+    await watchdog.watchdog_tick(shutdown_cb, notify_cb)
+
+    assert "выключен" in state["notified"]
+    assert state["shutdown"]
+    assert watchdog.mc_server.shutdown_remaining is None
