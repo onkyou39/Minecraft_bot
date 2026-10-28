@@ -1,16 +1,43 @@
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 import time
 from services import watchdog
+from state.minecraft_server import mc_server
 
 
 # для будущих тестов
-@pytest.fixture
-def clean_watchdog():
+@pytest.fixture(autouse=True)
+def clean_state():
     watchdog.watchdog_state.reset()
+    mc_server.reset_runtime()
     yield
     watchdog.watchdog_state.reset()
+
+
+@pytest.fixture
+def h(monkeypatch):
+    """Стенд: управляем сервером и временем, записываем все уведомления."""
+    clock = {"now": 1_700_000_000.0}
+    server = {"online": True, "players": 0}
+    h = SimpleNamespace(notifications=[], shutdowns=0)
+
+    async def refresh():
+        watchdog.mc_server.online = server["online"]
+        watchdog.mc_server.players_online = server["players"]
+
+    async def notify(msg): h.notifications.append(msg)
+    async def shutdown(): h.shutdowns += 1
+
+    monkeypatch.setattr(watchdog, "refresh_mc_server_state", refresh)
+    monkeypatch.setattr(watchdog, "time", SimpleNamespace(time=lambda: clock["now"]))
+
+    h.set_server = lambda online, players: server.update(online=online, players=players)
+    h.advance = lambda seconds: clock.__setitem__("now", clock["now"] + seconds)
+    h.now = lambda: clock["now"]
+    h.tick = lambda cb=notify: watchdog.watchdog_tick(shutdown, cb)
+    return h
 
 
 @pytest.mark.asyncio
@@ -263,3 +290,32 @@ async def test_empty_server_shutdown_at_exact_deadline(monkeypatch):
     assert "выключен" in state["notified"]
     assert state["shutdown"]
     assert watchdog.mc_server.shutdown_remaining is None
+
+
+@pytest.mark.asyncio
+async def test_warning_sent_once(h):
+    watchdog.watchdog_state.is_fresh_start = False
+    watchdog.watchdog_state.empty_since = (
+        h.now() - watchdog.mc_server.wd_poweroff_cooldown + watchdog.WATCHDOG_WARN_SECONDS - 1
+    )
+    await h.tick()
+    h.advance(watchdog.TICK_INTERVAL)
+    await h.tick()
+
+    assert sum("никого нет" in m for m in h.notifications) == 1
+
+
+@pytest.mark.asyncio
+async def test_warning_resent_after_server_blip(h):
+    watchdog.watchdog_state.is_fresh_start = False
+    watchdog.watchdog_state.warning_shutdown_sent = True
+    watchdog.watchdog_state.empty_since = h.now() - 100
+
+    h.set_server(online=False, players=None)
+    await h.tick()                      # одно пропадание, crashed == 1
+    h.set_server(online=True, players=0)
+    await h.tick()                      # таймер стартует заново
+    h.advance(watchdog.mc_server.wd_poweroff_cooldown - watchdog.WATCHDOG_WARN_SECONDS + 1)
+    await h.tick()
+
+    assert any("никого нет" in m for m in h.notifications)

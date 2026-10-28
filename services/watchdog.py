@@ -195,3 +195,5 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             await notify_callback("⏳ Minecraft сервер запускается...")
         watchdog_state.crashed += 1
         watchdog_state.empty_since = None  #  сброс таймера до корректного восстановления работы
+        watchdog_state.warning_shutdown_sent = False  # предупреждение должно прийти заново
+        mc_server.shutdown_remaining = None
