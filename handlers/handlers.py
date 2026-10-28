@@ -287,7 +287,7 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message.append("\n\n🔹 Группы: список пуст")
 
     # Инструкция по управлению
-    message.append("\nℹ️ Используйте /adduser, /removeuser, /addgroup, /removegroup для управления")
+    message.append("\n\nℹ️ Используйте /adduser, /removeuser, /addgroup, /removegroup для управления")
 
     await update.message.reply_text("".join(message))
 
