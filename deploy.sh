@@ -6,6 +6,11 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+if [ ! -f .env ]; then
+    echo "❌ .env file not found in $(pwd)"
+    exit 1
+fi
+
 # ----------------------------
 # Config & Argument Parsing
 # ----------------------------
@@ -78,17 +83,14 @@ fi
 # ----------------------------
 # Start new container
 # ----------------------------
-if [ ! -f .env ]; then
-    echo "❌ .env file not found in $(pwd)"
-    exit 1
-fi
-
 echo "🚀 Starting new container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   --memory="128m" \
   --cpus="0.5" \
   --restart unless-stopped \
+  --log-opt max-size=10m \
+  --log-opt max-file=3 \
   --env-file .env \
   "$CONTAINER_NAME:latest" \
   "${BOT_ARGS[@]}"
@@ -130,6 +132,8 @@ else
           --memory="128m" \
           --cpus="0.5" \
           --restart unless-stopped \
+          --log-opt max-size=10m \
+          --log-opt max-file=3 \
           --env-file .env \
           "$OLD_IMAGE_ID" \
           "${BOT_ARGS[@]}"
