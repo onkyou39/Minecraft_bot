@@ -6,6 +6,7 @@ import logging
 from telegram import Update
 from services import vps_service, watchdog
 from state import minecraft_server, bot_state as tg_bot_state
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -24,25 +25,37 @@ def log_command(command_name):
 
 def load_auth_data():
     try:
-        with open(bot_config.authorized_file, "r") as f:
+        with open(bot_config.authorized_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-            # Преобразуем список пользователей в словарь с int ключами
-            users = {int(user["id"]): user.get("username", "")
-                     for user in data.get("users", [])}
-            return users, set(data.get("groups", []))
     except (FileNotFoundError, json.JSONDecodeError):
         logger.warning("Authorization file not found or corrupted. Using empty sets.")
-        return {}, set()
+        return {}, {}
+
+    users = {int(user["id"]): user.get("username", "")
+             for user in data.get("users", [])}
+
+    groups = {}
+    for item in data.get("groups", []):
+        if isinstance(item, dict):  # новый формат
+            groups[int(item["id"])] = item.get("name") or str(item["id"])
+        else:  # старый формат: просто ID
+            groups[int(item)] = str(item)
+
+    return users, groups
 
 
 def save_auth_data():
     data = {
         "users": [{"id": uid, "username": name}
                   for uid, name in authorized_users.items()],
-        "groups": list(authorized_groups)
+        "groups": [{"id": gid, "name": name}
+                   for gid, name in authorized_groups.items()],
     }
-    with open(bot_config.authorized_file, "w") as f:
-        json.dump(data, f, indent=2)
+    path = bot_config.authorized_file
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)  # атомарная замена: битый файл не появится
 
 
 authorized_users, authorized_groups = load_auth_data()
