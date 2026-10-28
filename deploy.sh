@@ -33,8 +33,8 @@ while [ $# -gt 0 ]; do
 done
 
 # Try to get git commit hash for image tagging
-# fallback to "latest" if not in git repo
-IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "latest")
+# fallback to "nogit" if not in git repo
+IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "nogit")
 IMAGE_NAME="$CONTAINER_NAME:$IMAGE_TAG"
 
 echo "📦 Starting deployment of $CONTAINER_NAME..."
@@ -60,10 +60,6 @@ fi
 # ----------------------------
 echo "🏗️ Building new image..."
 docker build -t "$IMAGE_NAME" .
-
-# Tag image as latest for runtime simplicity
-echo "🏷️ Updating latest tag..."
-docker tag "$IMAGE_NAME" "$CONTAINER_NAME:latest"
 
 
 # ----------------------------
@@ -92,7 +88,7 @@ docker run -d \
   --log-opt max-size=10m \
   --log-opt max-file=3 \
   --env-file .env \
-  "$CONTAINER_NAME:latest" \
+  "$IMAGE_NAME" \
   "${BOT_ARGS[@]}"
 
 # ----------------------------
@@ -138,8 +134,6 @@ else
           "$OLD_IMAGE_ID" \
           "${BOT_ARGS[@]}"
 
-        # Moving the last tag back to the old stable image.
-        docker tag "$OLD_IMAGE_ID" "$CONTAINER_NAME:latest"
         echo "✅ Rollback complete. Old version is running."
     else
         echo "⚠️ No old image found to roll back to."
