@@ -159,14 +159,14 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
             return
 
         logger.info(
-            "Watchdog: server still empty, %s seconds left until shutdown",
+            "Watchdog: server still empty, shutdown due in %s seconds at the next tick",
             remaining
         )
 
         if remaining <= WATCHDOG_WARN_SECONDS and notify_callback and not watchdog_state.warning_shutdown_sent:
             await notify_callback(
                 f"ℹ️ На сервере никого нет. До выключения осталось "
-                f"{max(1, math.ceil(remaining / 60))} минут."
+                f"менее {max(1, math.ceil(remaining / 60))} минут."
             )
             watchdog_state.warning_shutdown_sent = True # для однократного вывода
 
