@@ -270,9 +270,9 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bot_service.authorized_users.items(), start=1
             )
         )
-        message.append(f"\n🔹 Пользователи ({len(bot_service.authorized_users)}):\n{users_list}")
+        message.append(f"\n\n🔹 Пользователи ({len(bot_service.authorized_users)}):\n{users_list}")
     else:
-        message.append("\n🔹 Пользователи: список пуст")
+        message.append("\n\n🔹 Пользователи: список пуст")
 
     # Список групп (порядок и нумерация совпадают с /removegroup <номер>)
     if bot_service.authorized_groups:
@@ -282,9 +282,9 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bot_service.authorized_groups.items(), start=1
             )
         )
-        message.append(f"\n🔹 Группы ({len(bot_service.authorized_groups)}):\n{groups_list}")
+        message.append(f"\n\n🔹 Группы ({len(bot_service.authorized_groups)}):\n{groups_list}")
     else:
-        message.append("\n🔹 Группы: список пуст")
+        message.append("\n\n🔹 Группы: список пуст")
 
     # Инструкция по управлению
     message.append("\nℹ️ Используйте /adduser, /removeuser, /addgroup, /removegroup для управления")
