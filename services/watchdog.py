@@ -155,8 +155,7 @@ async def watchdog_tick(shutdown_callback, notify_callback=None):
         if now >= deadline:
             logger.warning("Watchdog: server remained empty, cooldown passed — shutting down VPS")
             if notify_callback:
-                await notify_callback(f"🔴 Сервер выключен после "
-                                      f"{mc_server.wd_poweroff_cooldown // 60} минут неактивности.")
+                await notify_callback("🔴 Сервер выключен из-за неактивности.")
             await shutdown_callback()
             watchdog_state.empty_since = None  # Reset after shutdown
             watchdog_state.warning_shutdown_sent = False  # сбрасываем флаг после выключения
