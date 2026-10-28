@@ -8,7 +8,7 @@ Alternatively you can manually build and start Docker container using commands p
 ##### Building and running Docker image
 ```shell
 sudo docker build -t minecraft-bot .
-sudo docker run [-d --name minecraft_bot --memory="128m" --cpus="0.5" --restart unless-stopped] --env-file .env minecraft-bot
+sudo docker run [-d --name minecraft_bot --memory="128m" --cpus="0.5" --restart unless-stopped --log-opt max-size=10m --log-opt max-file=3] --env-file .env minecraft-bot
 ```
 
 ##### Copying authorization config
