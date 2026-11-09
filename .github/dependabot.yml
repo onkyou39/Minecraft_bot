@@ -8,18 +8,18 @@ updates:
   - package-ecosystem: "pip" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "semiannually"
+      interval: "quarterly"
     groups:
       production-dependencies:
         dependency-type: "production"
     cooldown:
-      default-days: 30
+      default-days: 14
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "semiannually"
+      interval: "quarterly"
     cooldown:
-      default-days: 30
+      default-days: 14
     ignore:
       - dependency-name: "python"
         update-types: ["version-update:semver-major"]
