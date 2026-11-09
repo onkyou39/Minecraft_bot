@@ -12,10 +12,14 @@ updates:
     groups:
       production-dependencies:
         dependency-type: "production"
+    cooldown:
+      default-days: 30
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "semiannually"
+    cooldown:
+      default-days: 30
     ignore:
       - dependency-name: "python"
         update-types: ["version-update:semver-major"]
