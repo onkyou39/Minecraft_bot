@@ -15,7 +15,12 @@ def log_command(command_name):
     def decorator(func):
         @wraps(func)
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-            logger.info(f"{get_user_name(update)} sent COMMAND {command_name}")
+            user = update.effective_user
+            chat = update.effective_chat
+            logger.info(
+                f"{get_user_name(update)} (user_id:{user.id if user else None}, "
+                f"chat_id:{chat.id if chat else None}) sent COMMAND {command_name}"
+            )
             return await func(update, context, *args, **kwargs)
 
         return wrapper
@@ -70,7 +75,10 @@ def is_authorized(chat_id: int) -> bool:
 
 
 def get_user_name(update: Update) -> str:
-    return update.effective_user.username or update.effective_user.full_name or "Неизвестный пользователь"
+    user = update.effective_user
+    if user is None:
+        return "Неизвестный пользователь"
+    return user.username or user.full_name or "Неизвестный пользователь"
 
 
 async def notify_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
