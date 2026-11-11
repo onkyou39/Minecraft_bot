@@ -49,6 +49,7 @@ def check_permissions(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not bot_service.is_authorized(update.effective_chat.id):
+            logger.warning(f"Command execution denied: not authorized")
             await update.message.reply_text("⛔ Недостаточно прав для выполнения команды.")
             return None
         return await func(update, context)
