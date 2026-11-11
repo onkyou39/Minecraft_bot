@@ -83,9 +83,13 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "CAACAgIAAxkBAAE30d1odlW8VXM4X4_8mUXrYpgZeHzbBQACzAADEhZhCiZG0nB7WA-qNgQ",
     ]
     message = update.effective_message
+    chat_type = update.effective_chat.type
 
-    # Проверяем, есть ли реплай или упоминание бота
-    is_reply = message.reply_to_message is not None
+    if chat_type == "private":
+        await message.reply_sticker(random.choice(sticker_ids))
+        return
+
+    is_reply = message.reply_to_message is not None or message.entities is not None
 
     if is_reply:
         random_sticker = random.choice(sticker_ids)
