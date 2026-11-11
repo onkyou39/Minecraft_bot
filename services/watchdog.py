@@ -4,7 +4,7 @@ import math
 import time
 from typing import Optional
 from mcstatus import JavaServer
-from re import search
+from re import compile as re_compile
 from dataclasses import dataclass, fields
 from telegram.ext import Job, JobQueue, ContextTypes
 from services import bot_service
@@ -12,6 +12,19 @@ from state.minecraft_server import mc_server
 from state.bot_state import bot_state
 
 logger = logging.getLogger(__name__)
+
+
+_VERSION_NUMBER_RE = re_compile(r"[0-9]+(?:\.[0-9]+)+")
+
+
+def parse_version_number(version: str) -> str:
+    """Достаёт номер версии (например, 1.21.4) из строки вроде «Paper 1.21.4».
+
+    У снапшотов (24w14a) и нестандартных сборок числового номера с точками нет —
+    в этом случае возвращаем строку версии как есть, чтобы не терять информацию.
+    """
+    match = _VERSION_NUMBER_RE.search(version)
+    return match.group(0) if match else version.strip()
 
 
 async def fast_check(host: str, port: int, timeout: float = 2.0):
@@ -48,8 +61,7 @@ async def refresh_mc_server_state(server_address: str = mc_server.server_address
                 mc_server.online = True
                 if not mc_server.version:
                     mc_server.version = status.version.name
-                    mc_server.version_number = (search(r"([0-9]+(\.[0-9]+)+)",
-                                                       mc_server.version)).group(1)
+                    mc_server.version_number = parse_version_number(mc_server.version)
             else:
                 logger.debug(f"Watchdog: OFFLINE Failed to get list of players online.")
                 mc_server.online = False
