@@ -90,23 +90,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Проверяем, является ли сообщение ответом
-    is_reply_to_someone = message.reply_to_message is not None
+    is_reply = message.reply_to_message is not None
 
-    # Проверяем, есть ли упоминание нашего бота через @
-    bot_username = context.bot.username  # Получаем юзернейм текущего бота автоматически
-    is_mentioned = False
-
-    if message.entities:
-        for entity in message.entities:
-            if entity.type == "mention":
-                # Извлекаем текст упоминания из сообщения
-                mention_text = message.text[entity.offset: entity.offset + entity.length]
-                # Сравниваем с юзернеймом бота (с учетом '@' или без)
-                if mention_text.lstrip('@').lower() == bot_username.lower():
-                    is_mentioned = True
-                    break
-
-    if is_reply_to_someone or is_mentioned:
+    if is_reply:
         random_sticker = random.choice(sticker_ids)
         await message.reply_sticker(random_sticker)
 
