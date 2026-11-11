@@ -292,9 +292,9 @@ async def list_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("".join(message))
 
 
-@check_maintenance
-@check_permissions
 @log_command("/poweron")
+@check_permissions
+@check_maintenance
 async def poweron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
 
@@ -434,9 +434,9 @@ async def poweroff(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❗ Ошибка подключения: {e}")
 
 
-@check_maintenance
-@check_permissions
 @log_command("/status")
+@check_permissions
+@check_maintenance
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     now = time.time()
@@ -516,8 +516,8 @@ async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🎮 Режим обслуживания выключен.")
 
 
-@check_permissions
 @log_command("/mute")
+@check_permissions
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.effective_chat.type != 'private' and update.effective_user.id != bot_config.admin_chat_id:
@@ -535,8 +535,8 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔔 Уведомления включены.")
 
 
-@check_permissions
 @log_command("/version")
+@check_permissions
 async def get_cached_mc_version(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Хендлер вывода текущей версии Minecraft сервера без запроса к API"""
     if mc_server.version and mc_server.online:
