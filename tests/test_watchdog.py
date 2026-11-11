@@ -452,7 +452,6 @@ async def test_refresh_parses_version_number(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="версия без цифр (например, снапшот) ломает опрос")
 async def test_refresh_survives_version_without_digits(monkeypatch):
     patch_status(monkeypatch, "24w14a")
 
@@ -460,7 +459,20 @@ async def test_refresh_survives_version_without_digits(monkeypatch):
 
     assert mc_server.online is True
     assert mc_server.players_online == 2
-    assert mc_server.version_number
+    assert mc_server.version_number == "24w14a"
+
+
+@pytest.mark.parametrize("version, expected", [
+    ("Paper 1.21.4", "1.21.4"),
+    ("1.21", "1.21"),
+    ("Spigot 1.8.8-R0.1-SNAPSHOT", "1.8.8"),
+    ("1.21 Pre-Release 1", "1.21"),
+    ("24w14a", "24w14a"),  # снапшот: числового номера нет — возвращаем как есть
+    ("  25w02a ", "25w02a"),
+    ("", ""),
+])
+def test_parse_version_number(version, expected):
+    assert watchdog.parse_version_number(version) == expected
 
 
 @pytest.mark.asyncio
