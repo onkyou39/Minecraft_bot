@@ -82,17 +82,14 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "CAACAgIAAxkBAAE30dtodlWgCk4M8LoEDC7-y99EJYEhagACEwEAAhIWYQpLBK0xp4kFOzYE",
         "CAACAgIAAxkBAAE30d1odlW8VXM4X4_8mUXrYpgZeHzbBQACzAADEhZhCiZG0nB7WA-qNgQ",
     ]
-    #await update.message.reply_text(update.message.text)
-    """chat_type = update.effective_chat.type  # 'private', 'group', 'supergroup', 'channel'
-    if chat_type != 'private':
-        return  # Не отвечаем на некомандные сообщения в группе"""
+    message = update.effective_message
 
-    """user_name = get_user_name(update)
-    message_text = update.message.text
-    logger.info(f"Message from {user_name}: {message_text}")"""
-    random_sticker = random.choice(sticker_ids)
-    await update.message.reply_sticker(random_sticker)
-    #await update.message.reply_text(random.choice(["🌚", "🌝"]))
+    # Проверяем, есть ли реплай или упоминание бота
+    is_reply = message.reply_to_message is not None
+
+    if is_reply:
+        random_sticker = random.choice(sticker_ids)
+        await message.reply_sticker(random_sticker)
 
 
 @log_command("/addgroup")
