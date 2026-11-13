@@ -89,12 +89,30 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_sticker(random.choice(sticker_ids))
         return
 
-    # Проверяем, является ли сообщение ответом
+    # Ответ на сообщение
     is_reply = message.reply_to_message is not None
 
-    if is_reply:
-        random_sticker = random.choice(sticker_ids)
-        await message.reply_sticker(random_sticker)
+    # Упоминание бота через @
+    is_mention = False
+    bot_username = context.bot.username  # без символа @
+    entities = message.entities or []
+    text = message.text or message.caption or ""
+    if message.caption_entities:
+        entities = list(entities) + list(message.caption_entities)
+
+    for entity in entities:
+        if entity.type == "mention":
+            mentioned = text[entity.offset: entity.offset + entity.length]
+            if mentioned.lower() == f"@{bot_username}".lower():
+                is_mention = True
+                break
+        elif entity.type == "text_mention":
+            if entity.user and entity.user.id == context.bot.id:
+                is_mention = True
+                break
+
+    if is_reply or is_mention:
+        await message.reply_sticker(random.choice(sticker_ids))
 
 
 @log_command("/addgroup")
