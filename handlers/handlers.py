@@ -96,7 +96,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_mention = False
     bot_username = context.bot.username  # без символа @
     entities = message.entities or []
-    text = message.text or message.caption or ""
+    text = (message.text or message.caption or "").lower()
     if message.caption_entities:
         entities = list(entities) + list(message.caption_entities)
 
